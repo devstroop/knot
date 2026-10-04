@@ -76,6 +76,60 @@ compact. Scalar reprs follow Python: `True`/`False`, `1.0`, `1e-05`.
 | Choice criteria as a list of labels | — | accepted; normalizes to `{str(label): None}` | same; `choice` and `probabilities` keys use Python `str()`, so a non-string label echoes as its text (`"True"`, `"7"`) rather than the typed JSON value |
 | Privacy/infra | hosted API | self-hosted, Apache 2.0 | self-hosted, Apache 2.0 |
 
+## Recorded Jev responses
+
+The only captured hosted-Jev traffic (`jev-1.13.0`, 192 recorded answers,
+`laya/research/benchmarks/feishu_zh/results/v1/jev/raw.jsonl`) confirms the
+table above and adds the response-level divergences. A Jev response and a
+Laya/oio response are **different JSON** even to the same request:
+
+- Jev sends `model, answers, usage` only — no `routing`, no
+  `answer_confidence`, no `action`.
+- Jev's answer key order is `type, choice, confidence, probabilities`
+  (noul: just `type, noul`); Laya/oio use Laya's order with the extra fields.
+- Jev rounds every probability to 2 decimals (768/768 recorded); Laya/oio to
+  4 (768/768).
+- Jev's `confidence` is `round2((n·p_max − 1)/(n − 1))` — re-verified against
+  the recordings (p_max 0.53 → 0.37, 0.85 → 0.80) — while Laya/oio use
+  1 − normalized entropy and gate on `answer_confidence`.
+- Jev's `usage.output_tokens` counts generated tokens (46–68 recorded);
+  Laya/oio always send 0.
+- Jev's `probabilities` key order varies per response (24 distinct orders in
+  192 answers despite a fixed request criteria order); Laya/oio always echo
+  criteria order.
+
+oio follows Laya in every row. Full evidence, serve-surface deltas and the
+quality/latency numbers: `docs/RESEARCH-COMPARE.md`.
+
+## HTTP surface parity (vs `laya-serve`)
+
+- `GET /health`: liveness `{"status":"ok"}` is always open; the bearer (or
+  no configured key) unlocks Laya's detail payload — `loaded`, `revisions`,
+  `device`, `device_is_preference`, `checkpoint_devices`, `cpu_fallbacks`,
+  in that order (`docs/http-api.md`). oio's values: `revisions` is the HF
+  snapshot etag the checkpoint was downloaded at (e.g. Laya's reviewed
+  `55cf4c4e…` for `convaiinnovations/laya`) or `null` for a hand-copied
+  directory — the same `null` Laya reports for a local path;
+  `checkpoint_devices` is `"cpu"` per resident name and `cpu_fallbacks` is
+  `{"count":0,"last_reason":null}` (oio has no other device, so no fallback
+  can ever occur).
+- Predict responses carry both timing headers Laya sends: `Server-Timing:
+  inference;dur=<ms>` and `X-Inference-Time-Ms: <ms>`.
+- `/v1/systemone/batch` accepts Laya's batch call controls with Laya's
+  validation: `batch_size` a positive integer (`"batch_size must be an
+  integer"` / `"batch_size must be a positive integer, got N"`), 
+  `sort_by_length` a boolean (`"sort_by_length must be a boolean"`), both
+  `null`-tolerated — all three wrong-type/range cases are 422. The engine
+  honours them the way `agent.py` does: chunking by `batch_size` (default
+  the whole group), a stable ascending length sort inside a `chunk*8` window
+  only when `1 < batch_size < n`, results written back to input positions.
+  The MCP batch tool validates the same arguments with Laya's merged MCP
+  wording (`"batch_size must be a positive integer, got {v!r}"`).
+- `GET /models` is **oio's extension** — laya-serve has no such route
+  (`docs/http-api.md` lists only `/health`, `/v1/systemone`,
+  `/v1/systemone/batch`). Clients written against Jev/Laya never call it;
+  it exists for local introspection.
+
 ## Porting checklist for an existing client
 
 1. Repoint base URL to `oio-serve`.
