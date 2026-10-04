@@ -32,4 +32,5 @@ Top-level milestone plan.
 
 Resolved: fixture format + export script → ADR-005; one binary vs two →
 ADR-004; model cache layout → SPEC §9 (resolution order, `SHA256SUMS`);
-device selection → SPEC §10 (explicit `cpu|cuda`, fail-fast).
+device selection → SPEC §10 (explicit `cpu|cuda`, fail-fast);
+platform baseline → PRD N1 (x86_64 Linux + Apple Silicon).

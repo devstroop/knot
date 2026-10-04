@@ -10,7 +10,13 @@ permissions:
 
 jobs:
   gates:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-latest is Apple Silicon (arm64) and free on public repos;
+        # it certifies the platform claim in PRD N1 on every PR.
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 

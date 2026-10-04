@@ -27,7 +27,7 @@ oio is a Rust implementation of the same decision-engine inference path, exposed
 | Strictness | Same 422/413 semantics; no silent truncation — report dropped state tokens |
 | Operability | Env config (`OIO_*`), structured logs (tracing), pinned model revisions, digest verification, graceful shutdown |
 | Extensibility | `Runtime` trait: ONNX first, candle native later, own kernels after |
-| License/cost | Apache-2.0, zero per-token cost, CPU baseline, GPU opt-in via ort CUDA EP (`OIO_DEVICE=cuda`) |
+| License/cost | Apache-2.0, zero per-token cost, CPU baseline (x86_64 Linux + macOS arm64), GPU opt-in via ort CUDA EP (`OIO_DEVICE=cuda`, x86_64 Linux) |
 
 ## 4. Non-goals (out of scope)
 
@@ -44,7 +44,8 @@ layer vs oio scope").
 | Training / fine-tuning, RLCD, calibration fitting, recipes (es_phone_turns 0.396 → 0.912) | consume Laya's published artifacts at a pinned revision + digest instead of rebuilding its research stack |
 | Compile fast-path (TileLang kernels, torch.compile) | no torch in the stack; kernels arrive later via the `Runtime` trait only if they pay for themselves |
 | Integrations: langchain/langgraph, LlamaIndex, CrewAI, TypeScript SDK | Laya keeps them; oio is a base-URL drop-in behind any HTTP or MCP client |
-| Automatic GPU selection (AMP, silent OOM→CPU fallback), WASM edge builds | CPU x86_64 Linux is the v1 baseline; ort CUDA EP is explicit opt-in behind `OIO_DEVICE=cuda` (SPEC §10) — automatic selection and silent fallback stay out |
+| Automatic GPU selection (AMP, silent OOM→CPU fallback), WASM edge builds | CPU x86_64 Linux + Apple Silicon is the v1 baseline; ort CUDA EP is explicit opt-in behind `OIO_DEVICE=cuda` (SPEC §10) — automatic selection and silent fallback stay out |
+| Intel Macs (`x86_64-apple-darwin`); CUDA outside x86_64 Linux | ONNX Runtime ships no prebuilt binaries for Intel Macs and ort's CUDA distributions are x86_64-Linux-only (ort-sys dist matrix); Apple Silicon stays on the CPU path (SPEC §10) |
 | ONNX export scripts, TensorRT capacity sweeps | checkpoints ship as ready-made ONNX; export belongs to Laya's toolchain and TRT rides on ONNX Runtime later |
 | Softlist retrieval training | the shortlist feature hook ships; training its retriever does not |
 
@@ -78,7 +79,7 @@ replay), per the gap ranking at the end of `RESEARCH-COMPARE.md`.
 
 | ID | Requirement |
 |---|---|
-| N1 | x86_64 Linux v1 with a CPU-only baseline (no GPU required; opt-in CUDA per SPEC §10); release build with thin LTO |
+| N1 | x86_64 Linux + macOS arm64 (Apple Silicon) v1 with a CPU-only baseline (no GPU required; opt-in CUDA per SPEC §10, x86_64 Linux only); release build with thin LTO |
 | N2 | Bounded concurrency via semaphore; token-budget cap env |
 | N3 | Tokenizer access serialized (mirrors Laya's shared-lock semantics) |
 | N4 | No network at inference time; models fetched explicitly with pinned revision + digest check |
