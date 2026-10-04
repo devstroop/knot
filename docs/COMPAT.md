@@ -76,6 +76,31 @@ compact. Scalar reprs follow Python: `True`/`False`, `1.0`, `1e-05`.
 | Choice criteria as a list of labels | — | accepted; normalizes to `{str(label): None}` | same; `choice` and `probabilities` keys use Python `str()`, so a non-string label echoes as its text (`"True"`, `"7"`) rather than the typed JSON value |
 | Privacy/infra | hosted API | self-hosted, Apache 2.0 | self-hosted, Apache 2.0 |
 
+## Recorded Jev responses
+
+The only captured hosted-Jev traffic (`jev-1.13.0`, 192 recorded answers,
+`laya/research/benchmarks/feishu_zh/results/v1/jev/raw.jsonl`) confirms the
+table above and adds the response-level divergences. A Jev response and a
+Laya/oio response are **different JSON** even to the same request:
+
+- Jev sends `model, answers, usage` only — no `routing`, no
+  `answer_confidence`, no `action`.
+- Jev's answer key order is `type, choice, confidence, probabilities`
+  (noul: just `type, noul`); Laya/oio use Laya's order with the extra fields.
+- Jev rounds every probability to 2 decimals (768/768 recorded); Laya/oio to
+  4 (768/768).
+- Jev's `confidence` is `round2((n·p_max − 1)/(n − 1))` — re-verified against
+  the recordings (p_max 0.53 → 0.37, 0.85 → 0.80) — while Laya/oio use
+  1 − normalized entropy and gate on `answer_confidence`.
+- Jev's `usage.output_tokens` counts generated tokens (46–68 recorded);
+  Laya/oio always send 0.
+- Jev's `probabilities` key order varies per response (24 distinct orders in
+  192 answers despite a fixed request criteria order); Laya/oio always echo
+  criteria order.
+
+oio follows Laya in every row. Full evidence, serve-surface deltas and the
+quality/latency numbers: `docs/RESEARCH-COMPARE.md`.
+
 ## Porting checklist for an existing client
 
 1. Repoint base URL to `oio-serve`.
