@@ -1,0 +1,37 @@
+{
+  "model": "laya-rl-agent",
+  "answers": {
+    "department": {
+      "type": "choice",
+      "choice": "technical",
+      "probabilities": {"billing": 0.05, "technical": 0.9, "other": 0.05},
+      "confidence": 0.89,
+      "answer_confidence": 0.9,
+      "action": {"act_probability": 0.98}
+    },
+    "urgency": {
+      "type": "score",
+      "score": 1.7,
+      "legend": {"0": "not urgent", "1": "soon", "2": "blocking"},
+      "probabilities": {"0": 0.1, "1": 0.7, "2": 0.2},
+      "confidence": 0.72,
+      "answer_confidence": 0.7,
+      "action": {"act_probability": 0.95}
+    },
+    "churn_risk": {
+      "type": "noul",
+      "noul": 0.13,
+      "confidence": 0.87,
+      "answer_confidence": 0.87,
+      "action": {"act_probability": 0.9}
+    }
+  },
+  "usage": {"input_tokens": 87, "output_tokens": 0, "state_tokens_dropped": 0, "truncated": false},
+  "routing": {
+    "model": "multilingual",
+    "repo": "convaiinnovations/laya/multilingual",
+    "reason": "Spanish detected",
+    "detection": null,
+    "workflow": null
+  }
+}

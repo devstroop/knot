@@ -1,0 +1,154 @@
+[
+ {
+  "input": "Hi, we were billed twice for March. Please refund the duplicate today.",
+  "script": "latin",
+  "is_english": true,
+  "language": "en",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": "La aplicación se cierra cada vez que abro la configuración.",
+  "script": "latin",
+  "is_english": false,
+  "language": null,
+  "non_latin_fraction": 0.0,
+  "language_undecided": true
+ },
+ {
+  "input": "मुझसे मार्च में दो बार शुल्क लिया गया, कृपया डुप्लिकेट राशि वापस करें।",
+  "script": "devanagari",
+  "is_english": false,
+  "language": null,
+  "non_latin_fraction": 1.0,
+  "language_undecided": true
+ },
+ {
+  "input": "Set α to 0.05 and pour water into the glass, then return to the main menu.",
+  "script": "latin",
+  "is_english": true,
+  "language": "en",
+  "non_latin_fraction": 0.0189,
+  "language_undecided": false
+ },
+ {
+  "input": "kan inte logga in på mitt konto",
+  "script": "latin",
+  "is_english": false,
+  "language": "sv",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": "Para fazer o login, use sua senha de acesso e depois clique em entrar.",
+  "script": "latin",
+  "is_english": false,
+  "language": "pt",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": "Deu erro 500 no endpoint de login depois do update ontem à noite.",
+  "script": "latin",
+  "is_english": false,
+  "language": "pt",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": "hello",
+  "script": "latin",
+  "is_english": true,
+  "language": null,
+  "non_latin_fraction": 0.0,
+  "language_undecided": true
+ },
+ {
+  "input": "",
+  "script": "unknown",
+  "is_english": true,
+  "language": null,
+  "non_latin_fraction": 0.0,
+  "language_undecided": true
+ },
+ {
+  "input": "12345 67890",
+  "script": "unknown",
+  "is_english": true,
+  "language": null,
+  "non_latin_fraction": 0.0,
+  "language_undecided": true
+ },
+ {
+  "input": "The quick brown fox jumps over the lazy dog and it was very quick indeed.",
+  "script": "latin",
+  "is_english": true,
+  "language": "en",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": "Voce pode me mandar a nota fiscal? Fiquei sem internet o dia inteiro.",
+  "script": "latin",
+  "is_english": false,
+  "language": "pt",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": "Quero cancelar o plano porque o preço subiu demais este mês.",
+  "script": "latin",
+  "is_english": false,
+  "language": "pt",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": "오늘 아침 회의가 너무 길어서 점심을 거르게 됐어요.",
+  "script": "hangul",
+  "is_english": false,
+  "language": null,
+  "non_latin_fraction": 1.0,
+  "language_undecided": true
+ },
+ {
+  "input": "\n\n[==== stack trace from client ====]\nos.path.join",
+  "script": "latin",
+  "is_english": true,
+  "language": "en",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": {
+   "body": "billed twice, refund please",
+   "email": "user@acme.com"
+  },
+  "script": "latin",
+  "is_english": true,
+  "language": "en",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": {
+   "text": "La aplicación se cierra cada vez",
+   "note": "los usuarios reportan lo mismo"
+  },
+  "script": "latin",
+  "is_english": false,
+  "language": "es",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ },
+ {
+  "input": {
+   "trace": "Exception in thread main: NullPointerException\nat com.acme.Main.run(Main.java:42)\nat java.lang.Thread.run(Thread.java:748)"
+  },
+  "script": "latin",
+  "is_english": true,
+  "language": "en",
+  "non_latin_fraction": 0.0,
+  "language_undecided": false
+ }
+]

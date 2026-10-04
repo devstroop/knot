@@ -1,0 +1,11 @@
+{
+  "model": "jev-1",
+  "state": {"body": "billed twice, refund please"},
+  "questions": {
+    "dept": {
+      "type": "choice",
+      "instructions": "which team?",
+      "criteria": {"billing": null, "tech": null}
+    }
+  }
+}

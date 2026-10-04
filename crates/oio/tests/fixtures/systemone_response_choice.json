@@ -1,0 +1,21 @@
+{
+  "model": "laya-rl-agent",
+  "answers": {
+    "dept": {
+      "type": "choice",
+      "choice": "billing",
+      "probabilities": {"billing": 0.94, "tech": 0.06},
+      "confidence": 0.94,
+      "answer_confidence": 0.93,
+      "action": {"act_probability": 0.99}
+    }
+  },
+  "usage": {"input_tokens": 42, "output_tokens": 0},
+  "routing": {
+    "model": "english",
+    "repo": "convaiinnovations/laya",
+    "reason": "English Latin text",
+    "detection": null,
+    "workflow": null
+  }
+}
