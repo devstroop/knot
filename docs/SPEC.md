@@ -23,6 +23,15 @@ these changes, update this file in the same change.
 - `confidence` = 1 − normalized entropy (matches Laya, **not** Jev's formula).
 - `answer_confidence` = probability of the reported answer. Gate on this.
 - Batch: `POST /v1/systemone/batch`, `states[]` with length ≤ 64.
+- Predict responses carry both timing headers, Laya's pair: `Server-Timing:
+  inference;dur=<ms>` and `X-Inference-Time-Ms: <ms>` (2 decimals, inference
+  time only — gate wait excluded).
+- `GET /health`: open liveness `{"status": "ok"}`; with the bearer (or no key
+  configured) the detail payload adds `loaded`, `revisions` (artifact commit
+  per resident checkpoint — HF snapshot etag when present, else `null`,
+  matching Laya's local-path value), `device`, `device_is_preference`,
+  `checkpoint_devices`, `cpu_fallbacks` — keyed by `loaded` names, Laya's
+  field order.
 
 ## 2. Prompt assembly (from Laya `common.py`)
 
@@ -76,8 +85,9 @@ these changes, update this file in the same change.
 ## 6. Limits & errors
 
 - HTTP: ≤ 100 choice options per question (else 413); `MAX_CONCURRENT` and
-  `MAX_TOKEN_BUDGET` caps (429/503 per server config); bearer auth when configured;
-  `/health` liveness always open.
+  `MAX_TOKEN_BUDGET` caps (429/503 per server config); bearer auth when
+  configured; `/health` liveness always open (detail payload requires the
+  bearer, see §1).
 - Library errors map: `InvalidRequest` → 422, `PayloadTooLarge` → 413,
   `Model` → 500.
 

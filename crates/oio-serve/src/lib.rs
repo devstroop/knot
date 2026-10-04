@@ -44,6 +44,12 @@ pub trait Predictor: Send + Sync {
         template: SystemOneRequest,
     ) -> oio::Result<Vec<SystemOneResponse>>;
     fn loaded(&self) -> Vec<&'static str>;
+    /// Artifact commit a resident checkpoint was loaded from — the
+    /// `revisions` entry of `/health`. `None` (the default, what stubs
+    /// report) means "unknown / local path", Laya's value for one.
+    fn revision(&self, _name: &str) -> Option<String> {
+        None
+    }
     fn route(
         &self,
         state: &serde_json::Value,
@@ -70,6 +76,10 @@ impl Predictor for Engine {
 
     fn loaded(&self) -> Vec<&'static str> {
         self.resident()
+    }
+
+    fn revision(&self, name: &str) -> Option<String> {
+        Engine::revision(self, name)
     }
 
     fn route(
@@ -406,9 +416,36 @@ async fn health(
 ) -> Response {
     let mut obj = serde_json::json!({"status": "ok"});
     if authorized(&headers, &state.config.api_key) {
-        obj["loaded"] = serde_json::json!(state.predictor.loaded());
-        obj["device"] = serde_json::json!("cpu");
-        obj["device_is_preference"] = serde_json::json!(false);
+        // Laya's detail payload, field for field (`serve.py` /health): the
+        // values are oio's own reality — always-CPU devices, zero CPU
+        // fallbacks (there is no other device to fall back from), and the
+        // artifact commit per resident checkpoint, or null for a local dir.
+        let names = state.predictor.loaded();
+        obj["loaded"] = serde_json::json!(&names);
+        let mut revisions = serde_json::Map::new();
+        let mut devices = serde_json::Map::new();
+        let mut fallbacks = serde_json::Map::new();
+        for name in &names {
+            revisions.insert(
+                (*name).to_string(),
+                state
+                    .predictor
+                    .revision(name)
+                    .map(serde_json::Value::String)
+                    .unwrap_or(serde_json::Value::Null),
+            );
+            devices.insert((*name).to_string(), serde_json::json!("cpu"));
+            fallbacks.insert(
+                (*name).to_string(),
+                serde_json::json!({"count": 0, "last_reason": serde_json::Value::Null}),
+            );
+        }
+        let resident_device = names.first().map(|_| "cpu");
+        obj["revisions"] = serde_json::Value::Object(revisions);
+        obj["device"] = serde_json::json!(resident_device.unwrap_or("cpu"));
+        obj["device_is_preference"] = serde_json::json!(resident_device.is_none());
+        obj["checkpoint_devices"] = serde_json::Value::Object(devices);
+        obj["cpu_fallbacks"] = serde_json::Value::Object(fallbacks);
     }
     Json(obj).into_response()
 }
@@ -540,6 +577,10 @@ async fn systemone(
                 apply_confidence_gate(&mut value, controls.min_confidence);
                 let mut resp = Json(value).into_response();
                 resp.headers_mut().insert(
+                    "server-timing",
+                    format!("inference;dur={infer_ms:.2}").parse().unwrap(),
+                );
+                resp.headers_mut().insert(
                     "x-inference-time-ms",
                     format!("{infer_ms:.2}").parse().unwrap(),
                 );
@@ -654,6 +695,10 @@ async fn systemone_batch(
                     "total_usage": {"input_tokens": total, "output_tokens": 0},
                 }))
                 .into_response();
+                resp.headers_mut().insert(
+                    "server-timing",
+                    format!("inference;dur={infer_ms:.2}").parse().unwrap(),
+                );
                 resp.headers_mut().insert(
                     "x-inference-time-ms",
                     format!("{infer_ms:.2}").parse().unwrap(),
