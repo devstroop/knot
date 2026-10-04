@@ -37,3 +37,74 @@ jobs:
       # checkpoint; set OIO_MODEL_DIR (a converted Laya export) to run them.
       - name: cargo test
         run: cargo test --workspace
+
+  # Full parity suites on Apple Silicon — the numeric half of the PRD N1
+  # platform claim: the same checkpoint pipeline as gpu.yml (HF fetch at
+  # the pinned revision + local ONNX export), cached per OS, then the
+  # whole workspace under OIO_MODEL_DIR. Free on this public repo; warm
+  # runs are cache restore + tests only.
+  parity-macos:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      HF_REVISION: 55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851
+      OIO_MODEL_DIR: ${{ github.workspace }}/.ckpt/laya-english
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/checkout@v7
+        with:
+          repository: devstroop/laya
+          ref: 4aa6761be8173de4ce6d92c31b3e40b6eaf59a7c
+          path: laya
+
+      - name: Python export toolchain (venv + torch CPU + laya[onnx])
+        run: |
+          python3 -m venv .venv-parity
+          echo "$PWD/.venv-parity/bin" >> "$GITHUB_PATH"
+          .venv-parity/bin/python -m pip install --upgrade pip
+          .venv-parity/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+          .venv-parity/bin/pip install "./laya[onnx]"
+
+      - name: Checkpoint cache (torch weights + exported ONNX)
+        uses: actions/cache@v4
+        with:
+          path: .ckpt
+          key: laya-english-${{ env.HF_REVISION }}-onnx-v1-${{ runner.os }}
+
+      - name: Fetch checkpoint (torch weights, pinned revision)
+        run: |
+          python3 - <<'PY'
+          import os
+          from huggingface_hub import snapshot_download
+          snap = snapshot_download(
+              "convaiinnovations/laya",
+              revision=os.environ["HF_REVISION"],
+              allow_patterns=[
+                  "*.json", "*.py", "model.safetensors",
+                  "tokenizer/*", "encoder/*",
+              ],
+              local_dir=os.environ["OIO_MODEL_DIR"],
+          )
+          print("checkpoint:", snap)
+          PY
+
+      - name: Export ONNX (the hub ships torch only)
+        run: |
+          if [ ! -f "$OIO_MODEL_DIR/laya.onnx" ]; then
+            HF_HUB_OFFLINE=1 python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, os.path.join(os.environ["GITHUB_WORKSPACE"], "laya"))
+          from scripts.export_onnx import export_to_onnx
+          d = os.environ["OIO_MODEL_DIR"]
+          export_to_onnx(d, os.path.join(d, "laya.onnx"))
+          PY
+          fi
+          ls -la "$OIO_MODEL_DIR"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo test with checkpoint (parity suites on arm64)
+        run: cargo test --workspace
