@@ -25,7 +25,8 @@ Top-level milestone plan.
 
 ## Open decisions (next rounds)
 
-- Exact fixture format + export script for checkpoint ONNX artifacts
 - Model cache layout under `~/.cache/oio`
 - GPU enablement (ort CUDA EP) timing
-- Whether `oio-serve` and MCP ship in one binary or two
+
+Resolved: fixture format + export script → ADR-005; one binary vs two →
+ADR-004.
