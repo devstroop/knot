@@ -12,9 +12,13 @@ use tower::ServiceExt;
 use oio::protocol::{Action, Answer, Routing, SystemOneRequest, SystemOneResponse, Usage};
 use oio_serve::{Predictor, ServeConfig, build_app};
 
-struct Stub;
+struct Stub(&'static str);
 
 impl Predictor for Stub {
+    fn device(&self) -> &'static str {
+        self.0
+    }
+
     fn predict(&self, req: &SystemOneRequest) -> oio::Result<SystemOneResponse> {
         let mut answers = IndexMap::new();
         for (qid, q) in &req.questions {
@@ -137,7 +141,7 @@ async fn call(
 }
 
 fn app(config: ServeConfig) -> axum::Router {
-    build_app(Arc::new(Stub), config)
+    build_app(Arc::new(Stub("cpu")), config)
 }
 
 fn simple_q() -> Value {
@@ -367,6 +371,22 @@ async fn health_detail_payload_matches_laya_shape() {
     assert_eq!(
         body["cpu_fallbacks"],
         json!({"english": {"count": 0, "last_reason": null}})
+    );
+}
+
+#[tokio::test]
+async fn health_detail_reports_the_configured_device() {
+    // SPEC §10: `/health` reports the device checkpoints really load onto.
+    let app = build_app(Arc::new(Stub("cuda")), ServeConfig::default());
+    let (st, body, _) = call(app, "GET", "/health", json!({})).await;
+    assert_eq!(st, 200);
+    assert_eq!(body["device"], json!("cuda"));
+    assert_eq!(body["checkpoint_devices"], json!({"english": "cuda"}));
+    assert_eq!(body["device_is_preference"], json!(false));
+    assert_eq!(
+        body["cpu_fallbacks"],
+        json!({"english": {"count": 0, "last_reason": null}}),
+        "a fallback never happens silently — failures are load errors"
     );
 }
 

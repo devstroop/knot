@@ -88,7 +88,7 @@ fn onnx_forward_matches_torch_fixture() {
         })
         .collect();
 
-    let rt = OnnxRuntime::load(&dir).unwrap();
+    let rt = OnnxRuntime::load(&dir, oio::runtime::Device::Cpu).unwrap();
     let (logits, _act) = rt
         .forward(
             &flat("input_ids"),
