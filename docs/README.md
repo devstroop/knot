@@ -10,6 +10,7 @@ level per working round.
 | [SPEC.md](SPEC.md) | Invariants: prompt format, budgets, confidence, errors, routing | Behavior contracts change |
 | [COMPAT.md](COMPAT.md) | Jev/Laya compatibility contract, porting notes | Wire semantics or diffs change |
 | [JEV-WIRE.md](JEV-WIRE.md) | Reference notes: what Laya's wire code actually does (evidence for COMPAT) | Laya reference behaviour is re-read |
+| [RESEARCH-COMPARE.md](RESEARCH-COMPARE.md) | Evidence: recorded Jev vs Laya vs oio wire, serve deltas, quality/latency numbers, scope ranking | New research evidence lands or gaps move |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Crate layout, one `predict()` data flow, `Runtime` trait | Crates/layers reorganize |
 | [ADR/](ADR/) | Why decisions were made (append-only) | New decision taken |
 
