@@ -1,5 +1,7 @@
 # oio
 
+[![CI](https://github.com/devstroop/oio/actions/workflows/ci.yml/badge.svg)](https://github.com/devstroop/oio/actions/workflows/ci.yml)
+
 Production-oriented Rust decision engine — a self-hosted, open alternative to
 TypeSafe's hosted Jev API, compatible with Laya's `/v1/systemone` wire protocol.
 
@@ -11,17 +13,16 @@ operability, latency, strictness, and deployability.
 
 | Path | Contents |
 |---|---|
-| `crates/oio` | Core library: wire protocol, prompt assembly, router, ONNX runtime |
-| `crates/oio-serve` | HTTP server binary (`/v1/systemone`, `/batch`, `/health`, `/models`) |
+| `crates/oio` | Core library: wire protocol, prompt assembly, router, ONNX/candle runtimes |
+| `crates/oio-serve` | HTTP server binary (`/v1/systemone`, `/batch`, `/health`, `/models`) + MCP stdio mode |
 | `docs/` | PRD, plan, spec, compatibility, architecture, ADRs |
-| `scripts/` | Checkpoint export / fixture tooling |
+| `scripts/` | Checkpoint fixture tooling |
 
-## Docs
+## Requirements
 
-- [docs/PRD.md](docs/PRD.md) — product requirements
-- [docs/PLAN.md](docs/PLAN.md) — milestone plan
-- [docs/SPEC.md](docs/SPEC.md) — invariants
-- [docs/COMPAT.md](docs/COMPAT.md) — Jev/Laya compatibility contract
+- Rust stable **1.88 or newer** (the crate uses let-chains).
+- A converted Laya checkpoint to **serve** or to run the parity suites; the
+  library and the fast test suites build without one.
 
 ## Build
 
@@ -29,3 +30,93 @@ operability, latency, strictness, and deployability.
 cargo check -p oio            # core (no model runtime)
 cargo check -p oio-serve      # pulls ONNX Runtime + tokenizers
 ```
+
+## Run
+
+```bash
+# HTTP server on :8000
+OIO_MODEL_DIR=/path/to/laya-english cargo run -p oio-serve
+
+# MCP stdio server (same engine, --mcp)
+OIO_MODEL_DIR=/path/to/laya-english cargo run -p oio-serve -- --mcp
+
+curl -s localhost:8000/v1/systemone \
+  -H 'content-type: application/json' \
+  -d '{
+    "state": "Customer was charged twice for order 1234 and wants it fixed",
+    "questions": {
+      "team": {
+        "type": "choice",
+        "instructions": "Which team handles this?",
+        "criteria": {
+          "billing": "invoices, payments, refunds",
+          "tech": "bugs, outages"
+        }
+      }
+    }
+  }'
+```
+
+## Configuration
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `OIO_MODEL_DIR` | — | Checkpoint directory (single model) |
+| `OIO_MODELS` | — | `name=/path[,name=/path...]` (multiple models; overrides `OIO_MODEL_DIR`) |
+| `OIO_DEFAULT_MODEL` | router fallback | Force the initial checkpoint |
+| `OIO_RUNTIME` | `onnx` | `onnx` or `candle` (native CPU) |
+| `OIO_API_KEY` | unset | Require `Authorization: Bearer <key>` |
+| `OIO_MAX_CONCURRENT` | `16` | In-flight predicts per process |
+| `OIO_MAX_TOKEN_BUDGET` | `8192` | Token budget cap |
+| `OIO_MAX_LOADED` | router default | LRU bound on resident checkpoints |
+| `OIO_AUTO_TASK` | `false` | Auto-detect typed-decisions workflow |
+| `OIO_HOST` | `0.0.0.0` | Bind address |
+| `OIO_PORT` | `8000` | Bind port |
+
+## Checkpoint
+
+A checkpoint directory is a converted Laya ONNX export:
+
+```
+laya-english/
+├── encoder/
+├── laya.onnx
+├── laya.onnx.data
+├── model.safetensors
+├── rl_agent_config.json
+└── tokenizer/
+```
+
+Without it the workspace still builds and all non-parity tests run; the
+engine/longdoc/onnx_parity/candle_parity suites skip themselves
+(`OIO_MODEL_DIR` unset) rather than fail.
+
+## Development
+
+```bash
+cargo fmt --all --check
+cargo clippy --all-targets -- -D warnings
+cargo test --workspace
+cargo check -p oio            # fast path: no ort/tokenizers/axum
+
+# full parity against the reference checkpoint
+OIO_MODEL_DIR=/path/to/laya-english cargo test --workspace
+```
+
+CI runs the first three on every push and pull request
+(`.github/workflows/ci.yml`).
+
+## Docs
+
+- [docs/PRD.md](docs/PRD.md) — product requirements
+- [docs/PLAN.md](docs/PLAN.md) — milestone plan
+- [docs/SPEC.md](docs/SPEC.md) — invariants
+- [docs/COMPAT.md](docs/COMPAT.md) — Jev/Laya compatibility contract
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — crate layout and data flow
+- [docs/JEV-WIRE.md](docs/JEV-WIRE.md) — reference notes on Laya's wire behaviour
+- [docs/ADR/](docs/ADR/) — decision records
+
+## License
+
+Copyright 2026 devstroop. Licensed under the
+[Apache License 2.0](LICENSE).
