@@ -17,6 +17,7 @@ tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 anyhow = "1"
 thiserror = "2"
+sha2 = "0.10"
 
 # Heavy/optional runtime deps (enabled per feature, see crates/*/Cargo.toml)
 ort = { version = "2.0.0-rc.13", default-features = false, features = ["std", "download-binaries", "tls-rustls"] }
