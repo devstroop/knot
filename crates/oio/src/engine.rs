@@ -58,6 +58,7 @@ fn snapshot_revision(model_dir: &Path) -> Option<String> {
 impl Checkpoint {
     #[cfg(feature = "onnx")]
     pub fn load(name: &'static str, model_dir: &Path) -> Result<Self> {
+        crate::integrity::verify_sha256sums(model_dir)?;
         let runtime: std::sync::Arc<dyn Runtime> =
             std::sync::Arc::new(OnnxRuntime::load(model_dir)?);
         let tokenizer = model_dir.join("tokenizer/tokenizer.json");
@@ -89,6 +90,7 @@ impl Checkpoint {
 
     #[cfg(feature = "candle")]
     pub fn load_candle(name: &'static str, model_dir: &Path) -> Result<Self> {
+        crate::integrity::verify_sha256sums(model_dir)?;
         let runtime: std::sync::Arc<dyn Runtime> =
             std::sync::Arc::new(CandleRuntime::load(model_dir)?);
         let tokenizer = model_dir.join("tokenizer/tokenizer.json");
