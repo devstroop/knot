@@ -8,10 +8,42 @@ use std::path::Path;
 #[cfg(feature = "onnx")]
 use std::sync::Mutex;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 
-#[cfg(feature = "onnx")]
-use crate::error::Error;
+/// Where checkpoints compute (SPEC §10). `Cpu` is the default and works in
+/// every build; `Cuda` needs the `cuda` feature and a Turing (sm_75)+ GPU.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Device {
+    #[default]
+    Cpu,
+    Cuda,
+}
+
+impl Device {
+    /// Parse `OIO_DEVICE`: `Some("cpu" | "cuda")`, or `None` → `Cpu`.
+    /// There is deliberately no `auto` — device selection is explicit
+    /// (SPEC §10).
+    pub fn parse(raw: Option<&str>) -> Result<Self> {
+        let Some(raw) = raw else {
+            return Ok(Self::Cpu);
+        };
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "cpu" => Ok(Self::Cpu),
+            "cuda" => Ok(Self::Cuda),
+            other => Err(Error::Model(format!(
+                "invalid OIO_DEVICE {other:?}: expected \"cpu\" or \"cuda\" (SPEC §10)"
+            ))),
+        }
+    }
+
+    /// The wire value `/health` reports (`cpu` / `cuda`).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Cpu => "cpu",
+            Self::Cuda => "cuda",
+        }
+    }
+}
 
 /// Uniform inference backend behind `Engine`: one collated forward pass,
 /// returning per-row marker logits and action logits.
@@ -179,10 +211,57 @@ impl Runtime for OnnxRuntime {
 
 #[cfg(feature = "onnx")]
 impl OnnxRuntime {
-    pub fn load(model_dir: &Path) -> Result<Self> {
+    /// Load `laya.onnx` from `model_dir` onto `device` (SPEC §10). Every
+    /// failure path is an `Error::Model` — a requested device never
+    /// silently downgrades to another one.
+    pub fn load(model_dir: &Path, device: Device) -> Result<Self> {
+        #[cfg(not(feature = "cuda"))]
+        if device == Device::Cuda {
+            return Err(Error::Model(
+                "OIO_DEVICE=cuda requires a build with the `cuda` feature \
+                 (cargo build -p oio-serve --features cuda)"
+                    .into(),
+            ));
+        }
+
+        let mut builder = ort::session::Session::builder()
+            .map_err(|e| Error::Model(format!("ort builder: {e}")))?;
+
+        #[cfg(feature = "cuda")]
+        if device == Device::Cuda {
+            use ort::ep::ExecutionProvider;
+            let cuda = ort::ep::CUDA::default();
+            match cuda.is_available() {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Err(Error::Model(
+                        "OIO_DEVICE=cuda: this ONNX Runtime build carries no CUDA \
+                         execution provider"
+                            .into(),
+                    ));
+                }
+                Err(e) => {
+                    return Err(Error::Model(format!(
+                        "OIO_DEVICE=cuda: CUDA availability probe failed: {e}"
+                    )));
+                }
+            }
+            // `error_on_failure()` turns a failed registration into an
+            // error instead of ort's default of logging a warning and
+            // falling back to CPU — the silent fallback PRD §4 forbids.
+            builder = builder
+                .with_execution_providers([cuda.build().error_on_failure()])
+                .map_err(|e| {
+                    Error::Model(format!(
+                        "OIO_DEVICE=cuda: CUDA execution provider registration \
+                         failed: {e} (needs a Turing sm_75+ GPU, driver r580+, \
+                         CUDA 13 runtime, cuDNN 9)"
+                    ))
+                })?;
+        }
+
         let onnx_path = model_dir.join("laya.onnx");
-        let session = ort::session::Session::builder()
-            .map_err(|e| Error::Model(format!("ort builder: {e}")))?
+        let session = builder
             .commit_from_file(&onnx_path)
             .map_err(|e| Error::Model(format!("load {}: {e}", onnx_path.display())))?;
         let cfg_path = model_dir.join("rl_agent_config.json");

@@ -10,6 +10,7 @@ default = []
 tokenizer = ["dep:tokenizers"]
 onnx = ["dep:ort", "tokenizer"]
 candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "tokenizer"]
+cuda = ["onnx", "ort/cuda"]
 
 [dependencies]
 serde.workspace = true

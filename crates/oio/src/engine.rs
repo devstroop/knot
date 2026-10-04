@@ -18,7 +18,7 @@ use crate::protocol::{
 use crate::router::Router;
 #[cfg(feature = "onnx")]
 use crate::runtime::OnnxRuntime;
-use crate::runtime::{Runtime, answer_confidence, confidence_from_probs, scaled_softmax};
+use crate::runtime::{Device, Runtime, answer_confidence, confidence_from_probs, scaled_softmax};
 
 /// A loaded checkpoint: tokenizer + ONNX session + budgets + calibration.
 pub struct Checkpoint {
@@ -57,10 +57,10 @@ fn snapshot_revision(model_dir: &Path) -> Option<String> {
 
 impl Checkpoint {
     #[cfg(feature = "onnx")]
-    pub fn load(name: &'static str, model_dir: &Path) -> Result<Self> {
+    pub fn load(name: &'static str, model_dir: &Path, device: Device) -> Result<Self> {
         crate::integrity::verify_sha256sums(model_dir)?;
         let runtime: std::sync::Arc<dyn Runtime> =
-            std::sync::Arc::new(OnnxRuntime::load(model_dir)?);
+            std::sync::Arc::new(OnnxRuntime::load(model_dir, device)?);
         let tokenizer = model_dir.join("tokenizer/tokenizer.json");
         let tokenizer = if tokenizer.exists() {
             tokenizer
@@ -125,7 +125,7 @@ impl Checkpoint {
 #[derive(Clone, Copy)]
 enum Loader {
     #[cfg(feature = "onnx")]
-    Onnx,
+    Onnx(Device),
     #[cfg(feature = "candle")]
     Candle,
 }
@@ -134,9 +134,19 @@ impl Loader {
     fn load(self, name: &'static str, dir: &Path) -> Result<Checkpoint> {
         match self {
             #[cfg(feature = "onnx")]
-            Loader::Onnx => Checkpoint::load(name, dir),
+            Loader::Onnx(device) => Checkpoint::load(name, dir, device),
             #[cfg(feature = "candle")]
             Loader::Candle => Checkpoint::load_candle(name, dir),
+        }
+    }
+
+    /// The device this loader puts checkpoints on (SPEC §10).
+    fn device(self) -> Device {
+        match self {
+            #[cfg(feature = "onnx")]
+            Loader::Onnx(device) => device,
+            #[cfg(feature = "candle")]
+            Loader::Candle => Device::Cpu,
         }
     }
 }
@@ -223,7 +233,19 @@ fn r4(v: f32) -> f32 {
 impl Engine {
     #[cfg(feature = "onnx")]
     pub fn load(router: Router, dirs: &[(&'static str, &Path)]) -> Result<Self> {
-        Self::load_with(router, dirs, Loader::Onnx)
+        Self::load_with_device(router, dirs, Device::Cpu)
+    }
+
+    /// Load onto an explicit device (SPEC §10): `Device::Cuda` registers
+    /// ort's CUDA execution provider and fails fast when it cannot come
+    /// up — never a silent CPU fallback (PRD §4).
+    #[cfg(feature = "onnx")]
+    pub fn load_with_device(
+        router: Router,
+        dirs: &[(&'static str, &Path)],
+        device: Device,
+    ) -> Result<Self> {
+        Self::load_with(router, dirs, Loader::Onnx(device))
     }
 
     #[cfg(feature = "candle")]
@@ -254,6 +276,12 @@ impl Engine {
             engine.router.lock().unwrap().touch(name);
         }
         Ok(engine)
+    }
+
+    /// The device resident checkpoints compute on (SPEC §10) — `/health`
+    /// reports it as `device` / `checkpoint_devices`.
+    pub fn device(&self) -> Device {
+        self.loader.device()
     }
 
     /// Names of the checkpoints currently resident (LRU-bounded).

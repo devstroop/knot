@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use oio::engine::Engine;
 use oio::router::{Router, normalise_name};
@@ -67,14 +67,22 @@ async fn main() -> Result<()> {
             )
         })
         .collect();
+    let device = oio::runtime::Device::parse(std::env::var("OIO_DEVICE").ok().as_deref())?;
     let engine = match std::env::var("OIO_RUNTIME").as_deref() {
         Ok("candle") => {
+            if device != oio::runtime::Device::Cpu {
+                bail!(
+                    "OIO_DEVICE={} requires OIO_RUNTIME=onnx — the candle runtime \
+                     is native CPU (SPEC §10)",
+                    device.as_str()
+                );
+            }
             tracing::info!("runtime: candle (native CPU)");
             Engine::load_candle(router, &dirs)?
         }
         _ => {
-            tracing::info!("runtime: onnx");
-            Engine::load(router, &dirs)?
+            tracing::info!(device = device.as_str(), "runtime: onnx");
+            Engine::load_with_device(router, &dirs, device)?
         }
     };
 

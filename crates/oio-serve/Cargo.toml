@@ -9,6 +9,9 @@ license.workspace = true
 name = "oio-serve"
 path = "src/main.rs"
 
+[features]
+cuda = ["oio/cuda"]
+
 [dependencies]
 oio = { workspace = true, features = ["onnx", "candle"] }
 serde.workspace = true

@@ -46,6 +46,12 @@ pub trait Predictor: Send + Sync {
         opts: oio::engine::BatchOpts,
     ) -> oio::Result<Vec<SystemOneResponse>>;
     fn loaded(&self) -> Vec<&'static str>;
+    /// Device resident checkpoints compute on (SPEC §10) — the `device` /
+    /// `checkpoint_devices` entries of `/health`. Defaults to `cpu`, the
+    /// only device a stub can have.
+    fn device(&self) -> &'static str {
+        "cpu"
+    }
     /// Artifact commit a resident checkpoint was loaded from — the
     /// `revisions` entry of `/health`. `None` (the default, what stubs
     /// report) means "unknown / local path", Laya's value for one.
@@ -79,6 +85,10 @@ impl Predictor for Engine {
 
     fn loaded(&self) -> Vec<&'static str> {
         self.resident()
+    }
+
+    fn device(&self) -> &'static str {
+        Engine::device(self).as_str()
     }
 
     fn revision(&self, name: &str) -> Option<String> {
@@ -463,10 +473,12 @@ async fn health(
     let mut obj = serde_json::json!({"status": "ok"});
     if authorized(&headers, &state.config.api_key) {
         // Laya's detail payload, field for field (`serve.py` /health): the
-        // values are oio's own reality — always-CPU devices, zero CPU
-        // fallbacks (there is no other device to fall back from), and the
-        // artifact commit per resident checkpoint, or null for a local dir.
+        // device oio actually loaded checkpoints onto (SPEC §10), zero CPU
+        // fallbacks (a provider failure is a load error, never a silent
+        // downgrade), and the artifact commit per resident checkpoint, or
+        // null for a local dir.
         let names = state.predictor.loaded();
+        let device = state.predictor.device();
         obj["loaded"] = serde_json::json!(&names);
         let mut revisions = serde_json::Map::new();
         let mut devices = serde_json::Map::new();
@@ -480,15 +492,15 @@ async fn health(
                     .map(serde_json::Value::String)
                     .unwrap_or(serde_json::Value::Null),
             );
-            devices.insert((*name).to_string(), serde_json::json!("cpu"));
+            devices.insert((*name).to_string(), serde_json::json!(device));
             fallbacks.insert(
                 (*name).to_string(),
                 serde_json::json!({"count": 0, "last_reason": serde_json::Value::Null}),
             );
         }
-        let resident_device = names.first().map(|_| "cpu");
+        let resident_device = names.first().map(|_| device);
         obj["revisions"] = serde_json::Value::Object(revisions);
-        obj["device"] = serde_json::json!(resident_device.unwrap_or("cpu"));
+        obj["device"] = serde_json::json!(resident_device.unwrap_or(device));
         obj["device_is_preference"] = serde_json::json!(resident_device.is_none());
         obj["checkpoint_devices"] = serde_json::Value::Object(devices);
         obj["cpu_fallbacks"] = serde_json::Value::Object(fallbacks);
