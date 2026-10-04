@@ -51,6 +51,14 @@ these changes, update this file in the same change.
 
 - Rendered options: `choice` → `"label: criterion"` (or the label alone);
   `score` → `"level i: criterion"`; `noul` → `"<label>: <criterion or default>"`.
+- The special ids behind `[CLS]`/`[SEP]`/`[MASK]` resolve the way Laya's
+  AutoTokenizer does: the declarations in `tokenizer_config.json` /
+  `special_tokens_map.json` beside the vocabulary win; candidate strings
+  (`[CLS]` → `<s>` → `<bos>`, …) are only a fallback for a vocabulary with no
+  sibling config. A vocabulary may contain look-alike entries that are plain
+  tokens — mmBERT ships `<s>`/`</s>` at 204/213 while its config declares
+  `<bos>`/`<eos>` at 2/1 — and picking those would frame the sequence with
+  content tokens.
 - Each option span is `[MASK]` + ≤ 48 tokens of option text.
 - Options collectively share `head_max_len` (192 for English checkpoint, 256 otherwise).
   Overflow → per-option cap (`tokens_per_option` in stats); if options no longer fit, 422.
