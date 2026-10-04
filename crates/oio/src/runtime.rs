@@ -218,8 +218,9 @@ impl OnnxRuntime {
         #[cfg(not(feature = "cuda"))]
         if device == Device::Cuda {
             return Err(Error::Model(
-                "OIO_DEVICE=cuda requires a build with the `cuda` feature \
-                 (cargo build -p oio-serve --features cuda)"
+                "OIO_DEVICE=cuda requires an x86_64-Linux build with the \
+                 `cuda` feature (cargo build -p oio-serve --features cuda); \
+                 this target stays on cpu (SPEC §10)"
                     .into(),
             ));
         }

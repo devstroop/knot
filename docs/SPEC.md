@@ -160,6 +160,9 @@ downgrade (PRD §4).
   build ships CUDA 13 binaries: Turing (sm_75) or newer GPU, driver
   r580+, cuDNN 9, ~2 GB VRAM. Requesting `cuda` on a build without the
   feature is a startup error naming the feature — never a CPU fallback.
+  The feature and the provider are x86_64-Linux-only (ort ships no CUDA
+  distributions elsewhere): every other target — Apple Silicon included —
+  stays on `cpu`, and asking for `cuda` there is that same startup error.
 - `OIO_RUNTIME=candle` together with `OIO_DEVICE=cuda` is a startup
   error: the CUDA path is ort's, the candle runtime is native CPU
   (ADR-001).

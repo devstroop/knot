@@ -21,6 +21,9 @@ operability, latency, strictness, and deployability.
 ## Requirements
 
 - Rust stable **1.88 or newer** (the crate uses let-chains).
+- Platforms: x86_64 Linux and macOS on Apple Silicon (arm64). Intel Macs
+  have no ONNX Runtime prebuilts, and the `cuda` feature /
+  `OIO_DEVICE=cuda` are x86_64-Linux-only (SPEC §10).
 - A converted Laya checkpoint to **serve** or to run the parity suites; the
   library and the fast test suites build without one.
 
