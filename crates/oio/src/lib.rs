@@ -4,6 +4,7 @@
 //! over typed questions (`choice` / `score` / `noul`).
 
 pub mod error;
+pub mod integrity;
 pub mod lang;
 pub mod protocol;
 pub mod pyjson;

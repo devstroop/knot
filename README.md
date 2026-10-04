@@ -63,6 +63,7 @@ curl -s localhost:8000/v1/systemone \
 |---|---|---|
 | `OIO_MODEL_DIR` | — | Checkpoint directory (single model) |
 | `OIO_MODELS` | — | `name=/path[,name=/path...]` (multiple models; overrides `OIO_MODEL_DIR`) |
+| `OIO_CACHE_DIR` | `~/.cache/oio` | Model cache root (else `$XDG_CACHE_HOME/oio`) — see Checkpoint |
 | `OIO_DEFAULT_MODEL` | router fallback | Force the initial checkpoint |
 | `OIO_RUNTIME` | `onnx` | `onnx` or `candle` (native CPU) |
 | `OIO_API_KEY` | unset | Require `Authorization: Bearer <key>` |
@@ -87,8 +88,33 @@ laya-english/
 └── tokenizer/
 ```
 
-Without it the workspace still builds and all non-parity tests run; the
-engine/longdoc/onnx_parity/candle_parity suites skip themselves
+Resolution order (SPEC §9): `OIO_MODELS` → `OIO_MODEL_DIR` → the cache
+(`$OIO_CACHE_DIR`, else `$XDG_CACHE_HOME/oio`, else `~/.cache/oio`). The cache
+holds one directory per canonical checkpoint name (`english`,
+`multilingual`); stray subdirectories are ignored:
+
+```
+~/.cache/oio/
+├── english/        # snapshot root (layout above)
+└── multilingual/   # …/multilingual subdir of the same snapshot
+```
+
+Fetching is an explicit operator step; inference never touches the network:
+
+```bash
+huggingface-cli download convaiinnovations/laya --revision <pin> --local-dir /srv/laya
+OIO_MODELS=english=/srv/laya,multilingual=/srv/laya/multilingual oio-serve
+```
+
+A coreutils `SHA256SUMS` manifest beside a checkpoint makes load verify every
+listed file (mismatch → model error); without one, loading proceeds untouched:
+
+```bash
+cd /srv/laya && sha256sum laya.onnx laya.onnx.data rl_agent_config.json > SHA256SUMS
+```
+
+Without a checkpoint the workspace still builds and all non-parity tests run;
+the engine/longdoc/onnx_parity/candle_parity suites skip themselves
 (`OIO_MODEL_DIR` unset) rather than fail.
 
 ## Development

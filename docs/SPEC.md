@@ -119,3 +119,31 @@ these changes, update this file in the same change.
 
 - Same checkpoint + same request + fp32 ONNX → same decisions. Any numeric drift beyond
   fixture tolerance blocks release.
+
+## 9. Model resolution & integrity
+
+Checkpoint directories resolve at startup, first source that yields at least
+one directory wins:
+
+1. `OIO_MODELS=name=/path[,...]` — explicit map, declaration order kept.
+2. `OIO_MODEL_DIR=/path` — shorthand for a single `english` checkpoint.
+3. Cache root: `$OIO_CACHE_DIR`, else `$XDG_CACHE_HOME/oio`, else
+   `~/.cache/oio` (ADR-002). Only directories named in `router::DEFAULT_MODELS`
+   (`english`, `multilingual`) are picked up; stray subdirectories are ignored,
+   and the order follows that table.
+4. Nothing resolves → startup error naming all three sources.
+
+The router's fallback model is `english`. When `english` is not among the
+resolved directories and `OIO_DEFAULT_MODEL` is unset, the fallback becomes
+the first resolved directory (source order above). `OIO_DEFAULT_MODEL`, when
+set, is validated by name at startup and never second-guessed.
+
+Integrity is verify-if-present: a `SHA256SUMS` manifest beside a checkpoint
+(coreutils format — `<64-hex> <space>[`*`]<relative-path>`, `#` comments and
+blank lines skipped) is checked when the checkpoint loads. Every listed file
+must exist under the directory and hash-match; absolute paths or `..`
+components are rejected. A mismatch or missing file is a `Model` error
+(→ HTTP 500). No manifest → load proceeds untouched, mirroring
+`snapshot_revision` returning `None` for hand-copied weights. Fetching and
+manifest creation are explicit operator steps; inference never touches the
+network (PRD N4).
