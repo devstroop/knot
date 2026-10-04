@@ -97,9 +97,38 @@ calibration and latency; Jev wins the Chinese workplace diagnostic decisively
 and is competitive on Banking77. Both ship over-confident (Laya refits to ECE
 0.081; Jev's published ECE is 0.246 with a 13% option-order flip rate — the
 research README's own framing). oio inherits Laya's quality profile from the
-same weights but has measured nothing of its own yet: the parity suites prove
-behavior against fixtures, not accuracy or latency. The evidence-harness gap
-below is where that gets closed.
+same weights; its own numbers start with the harness below — the parity
+suites still only prove behaviour against fixtures.
+
+## oio measured (evidence harness)
+
+Warm in-process `Engine::predict` over the recorded English corpus (12
+cases, 1 question each, harvested from `laya/research/evals/fixture.jsonl`
+→ `crates/oio/tests/fixtures/eval_english.jsonl`), 240 samples / 20
+rounds, `crates/oio/tests/evidence.rs` on an Intel i5-8279U (4c/8t),
+7 GiB, onnxruntime CPU:
+
+| run | mean | p50 | p95 |
+|---|---|---|---|
+| release | 367.95 ms | 360.45 ms | 452.85 ms |
+| release (second run) | 386.87 ms | 385.18 ms | 480.16 ms |
+| debug (same gate as CI) | 355.82 ms | 353.84 ms | 408.73 ms |
+
+Context, not a verdict: Laya's torch-CPU run of the same 1-question
+English workload on a 4-core EPYC `m7a.xlarge` recorded **580 ms p50**
+(`laya/research/results/latency_cpu_m7a_xlarge_20260924.json`), so
+oio-on-a-laptop sits in the same order of magnitude with no pathology —
+different hardware, so this is not a head-to-head win. The `32.8 ms`
+above is a T4 GPU figure. Debug and release barely differ because
+inference happens inside onnxruntime either way.
+
+The same test binary replays the corpus against
+`crates/oio/tests/fixtures/golden_english.json` in the default gate:
+**oio-recorded** goldens (no runnable Laya environment exists here — the
+system Python lacks `onnxruntime` and `torch`), choices exact,
+probabilities within 1e-3, regenerated with `OIO_UPDATE_GOLDEN=1` after an
+intentional behaviour change. Accuracy claims stay Laya's research tree
+(PRD §4).
 
 ## Laya's experimental layer vs oio scope
 
@@ -114,7 +143,7 @@ below is where that gets closed.
 | Integrations: langchain/langgraph, LlamaIndex, CrewAI, TypeScript SDK | yes | no |
 | GPU: CUDA/AMP, silent OOM→CPU fallback, length-sorted batching (measured 2.15× on 10k tickets, `research/README.md:66-71`) | yes | CPU only (ort + candle); length sorting implemented (`batch_size`/`sort_by_length`, planning-only — no answer changes) |
 | ONNX export scripts, TensorRT capacity sweeps | export scripts, TRT via ONNX Runtime | ort CPU, no export script |
-| Research benches: feishu_zh, zh_short_commands, position sensitivity, latency, NVIDIA capacity | yes | latency bench pending (evidence harness) |
+| Research benches: feishu_zh, zh_short_commands, position sensitivity, latency, NVIDIA capacity | yes | in-process latency bench + golden replay shipped (`tests/evidence.rs`); accuracy benches stay out of scope (PRD §4) |
 
 Most of the right-hand column is out of oio's scope by design (a local,
 hosted-free HTTP/MCP decision server); `PRD.md` now states that explicitly.
@@ -126,5 +155,6 @@ hosted-free HTTP/MCP decision server); `PRD.md` now states that explicitly.
 2. **`sort_by_length`** — laya's measured 2.15× with zero decision changes;
    implemented as G3's engine effect (chunked, stable length sort).
 3. **Scope declarations** — PRD/PLAN record the "no" column above.
-4. **Evidence harness** — latency numbers and an end-to-end golden replay so
-   oio measures itself, not just its fixtures.
+4. **Evidence harness** — shipped: warm in-process latency (quoted above)
+   plus a golden replay of the recorded English corpus in the default gate
+   (`crates/oio/tests/evidence.rs`).

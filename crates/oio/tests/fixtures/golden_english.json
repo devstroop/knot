@@ -1,0 +1,718 @@
+{
+  "note": "oio-recorded goldens (not Laya: no runnable Laya env on the recording machine). Regenerate with OIO_UPDATE_GOLDEN=1 after an intentional behaviour change; review the diff.",
+  "source": "tests/fixtures/eval_english.jsonl (laya/research/evals/fixture.jsonl)",
+  "cases": [
+    {
+      "state": "I was charged twice for the same order, please refund me.",
+      "questions": {
+        "intent": {
+          "type": "choice",
+          "instructions": "What is the user asking for?",
+          "criteria": {
+            "billing": "refunds or charges",
+            "technical": "bugs or errors",
+            "sales": "pricing or purchase"
+          }
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "intent": {
+            "type": "choice",
+            "choice": "billing",
+            "probabilities": {
+              "billing": 0.9750999808311462,
+              "technical": 0.013100000098347664,
+              "sales": 0.011800000444054604
+            },
+            "confidence": 0.8780999779701233,
+            "answer_confidence": 0.9750999808311462,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 46,
+          "output_tokens": 0,
+          "state_tokens": 13,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "The app crashes whenever I upload a photo.",
+      "questions": {
+        "intent": {
+          "type": "choice",
+          "instructions": "What is the user asking for?",
+          "criteria": {
+            "billing": "refunds or charges",
+            "technical": "bugs or errors",
+            "sales": "pricing or purchase"
+          }
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "intent": {
+            "type": "choice",
+            "choice": "technical",
+            "probabilities": {
+              "billing": 0.01679999940097332,
+              "technical": 0.9613000154495239,
+              "sales": 0.021900000050663948
+            },
+            "confidence": 0.8267999887466431,
+            "answer_confidence": 0.9613000154495239,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 42,
+          "output_tokens": 0,
+          "state_tokens": 9,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "How much does the pro plan cost for ten seats?",
+      "questions": {
+        "intent": {
+          "type": "choice",
+          "instructions": "What is the user asking for?",
+          "criteria": {
+            "billing": "refunds or charges",
+            "technical": "bugs or errors",
+            "sales": "pricing or purchase"
+          }
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "intent": {
+            "type": "choice",
+            "choice": "billing",
+            "probabilities": {
+              "billing": 0.678600013256073,
+              "technical": 0.034699998795986176,
+              "sales": 0.2867000102996826
+            },
+            "confidence": 0.32829999923706055,
+            "answer_confidence": 0.678600013256073,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 44,
+          "output_tokens": 0,
+          "state_tokens": 11,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "I was billed again after cancelling, so I want a refund.",
+      "questions": {
+        "intent": {
+          "type": "choice",
+          "instructions": "What is the user asking for?",
+          "criteria": {
+            "billing": "refunds or charges",
+            "technical": "bugs or errors",
+            "sales": "pricing or purchase"
+          }
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "intent": {
+            "type": "choice",
+            "choice": "billing",
+            "probabilities": {
+              "billing": 0.9803000092506409,
+              "technical": 0.011900000274181366,
+              "sales": 0.007899999618530273
+            },
+            "confidence": 0.8996999859809875,
+            "answer_confidence": 0.9803000092506409,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 48,
+          "output_tokens": 0,
+          "state_tokens": 15,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "Your service has been down for two hours and we are losing money.",
+      "questions": {
+        "urgency": {
+          "type": "score",
+          "instructions": "How urgent is this?",
+          "criteria": [
+            "not urgent",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "urgency": {
+            "type": "score",
+            "score": 1.87090003490448,
+            "legend": {
+              "0": "not urgent",
+              "1": "low",
+              "2": "medium",
+              "3": "high",
+              "4": "critical"
+            },
+            "probabilities": {
+              "0": 0.2533999979496002,
+              "1": 0.12960000336170197,
+              "2": 0.3098999857902527,
+              "3": 0.10689999908208847,
+              "4": 0.20020000636577606
+            },
+            "confidence": 0.04520000144839287,
+            "answer_confidence": 0.3098999857902527,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 52,
+          "output_tokens": 0,
+          "state_tokens": 14,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "I need this fixed before our launch tomorrow.",
+      "questions": {
+        "urgency": {
+          "type": "score",
+          "instructions": "How urgent is this?",
+          "criteria": [
+            "not urgent",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "urgency": {
+            "type": "score",
+            "score": 1.6865999698638916,
+            "legend": {
+              "0": "not urgent",
+              "1": "low",
+              "2": "medium",
+              "3": "high",
+              "4": "critical"
+            },
+            "probabilities": {
+              "0": 0.16439999639987946,
+              "1": 0.20509999990463257,
+              "2": 0.47940000891685486,
+              "3": 0.08160000294446945,
+              "4": 0.06949999928474426
+            },
+            "confidence": 0.1525000035762787,
+            "answer_confidence": 0.47940000891685486,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 47,
+          "output_tokens": 0,
+          "state_tokens": 9,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "Just wondering when the next release is planned.",
+      "questions": {
+        "urgency": {
+          "type": "score",
+          "instructions": "How urgent is this?",
+          "criteria": [
+            "not urgent",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "urgency": {
+            "type": "score",
+            "score": 1.1121000051498413,
+            "legend": {
+              "0": "not urgent",
+              "1": "low",
+              "2": "medium",
+              "3": "high",
+              "4": "critical"
+            },
+            "probabilities": {
+              "0": 0.38929998874664307,
+              "1": 0.18389999866485596,
+              "2": 0.37529999017715454,
+              "3": 0.02850000001490116,
+              "4": 0.023000000044703484
+            },
+            "confidence": 0.23280000686645508,
+            "answer_confidence": 0.38929998874664307,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 47,
+          "output_tokens": 0,
+          "state_tokens": 9,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "There is a typo in the documentation.",
+      "questions": {
+        "urgency": {
+          "type": "score",
+          "instructions": "How urgent is this?",
+          "criteria": [
+            "not urgent",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "urgency": {
+            "type": "score",
+            "score": 0.8126999735832214,
+            "legend": {
+              "0": "not urgent",
+              "1": "low",
+              "2": "medium",
+              "3": "high",
+              "4": "critical"
+            },
+            "probabilities": {
+              "0": 0.5048999786376953,
+              "1": 0.18529999256134033,
+              "2": 0.30399999022483826,
+              "3": 0.003700000001117587,
+              "4": 0.002099999925121665
+            },
+            "confidence": 0.3456999957561493,
+            "answer_confidence": 0.5048999786376953,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 47,
+          "output_tokens": 0,
+          "state_tokens": 9,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "Please give me my money back.",
+      "questions": {
+        "refund": {
+          "type": "noul",
+          "instructions": "Is the user asking for a refund?"
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "refund": {
+            "type": "noul",
+            "noul": 0.8989999890327454,
+            "confidence": 0.8989999890327454,
+            "answer_confidence": 0.8989999890327454,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 41,
+          "output_tokens": 0,
+          "state_tokens": 7,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "The package arrived on Tuesday and works fine.",
+      "questions": {
+        "refund": {
+          "type": "noul",
+          "instructions": "Is the user asking for a refund?"
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "refund": {
+            "type": "noul",
+            "noul": 0.03519999980926514,
+            "confidence": 0.9648000001907349,
+            "answer_confidence": 0.9648000001907349,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 43,
+          "output_tokens": 0,
+          "state_tokens": 9,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "Can I change the email on my account?",
+      "questions": {
+        "refund": {
+          "type": "noul",
+          "instructions": "Is the user asking for a refund?"
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "refund": {
+            "type": "noul",
+            "noul": 0.0,
+            "confidence": 1.0,
+            "answer_confidence": 1.0,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 43,
+          "output_tokens": 0,
+          "state_tokens": 9,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    },
+    {
+      "state": "This is unacceptable, please escalate this to a manager right now.",
+      "questions": {
+        "escalate": {
+          "type": "noul",
+          "instructions": "Does the user want a manager or an escalation?"
+        }
+      },
+      "response": {
+        "model": "laya-rl-agent",
+        "answers": {
+          "escalate": {
+            "type": "noul",
+            "noul": 0.6215999722480774,
+            "confidence": 0.6215999722480774,
+            "answer_confidence": 0.6215999722480774,
+            "action": {
+              "act_probability": 1.0
+            }
+          }
+        },
+        "usage": {
+          "input_tokens": 51,
+          "output_tokens": 0,
+          "state_tokens": 14,
+          "state_tokens_dropped": 0,
+          "truncated": false,
+          "truncated_questions": []
+        },
+        "routing": {
+          "model": "english",
+          "repo": "convaiinnovations/laya",
+          "reason": "English Latin text",
+          "detection": {
+            "script": "latin",
+            "script_profile": {
+              "latin": 1.0
+            },
+            "language": "en",
+            "is_english": true,
+            "language_undecided": false,
+            "diacritic_rate": 0.0,
+            "non_latin_fraction": 0.0,
+            "mixed_segment": null
+          },
+          "workflow": null
+        }
+      }
+    }
+  ]
+}
