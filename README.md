@@ -29,6 +29,8 @@ operability, latency, strictness, and deployability.
 ```bash
 cargo check -p oio            # core (no model runtime)
 cargo check -p oio-serve      # pulls ONNX Runtime + tokenizers
+cargo check -p oio-serve --features cuda   # + ort CUDA EP (Turing sm_75+,
+                                           #   driver r580+, CUDA 13, cuDNN 9)
 ```
 
 ## Run
@@ -36,6 +38,11 @@ cargo check -p oio-serve      # pulls ONNX Runtime + tokenizers
 ```bash
 # HTTP server on :8000
 OIO_MODEL_DIR=/path/to/laya-english cargo run -p oio-serve
+
+# same server on the GPU (needs the cuda feature build; fails fast if the
+# device cannot come up — never a silent CPU downgrade)
+OIO_MODEL_DIR=/path/to/laya-english OIO_DEVICE=cuda \
+    cargo run -p oio-serve --features cuda
 
 # MCP stdio server (same engine, --mcp)
 OIO_MODEL_DIR=/path/to/laya-english cargo run -p oio-serve -- --mcp
@@ -66,6 +73,7 @@ curl -s localhost:8000/v1/systemone \
 | `OIO_CACHE_DIR` | `~/.cache/oio` | Model cache root (else `$XDG_CACHE_HOME/oio`) — see Checkpoint |
 | `OIO_DEFAULT_MODEL` | router fallback | Force the initial checkpoint |
 | `OIO_RUNTIME` | `onnx` | `onnx` or `candle` (native CPU) |
+| `OIO_DEVICE` | `cpu` | `cpu` or `cuda` (ort CUDA EP, needs a `cuda`-feature build — SPEC §10) |
 | `OIO_API_KEY` | unset | Require `Authorization: Bearer <key>` |
 | `OIO_MAX_CONCURRENT` | `16` | In-flight predicts per process |
 | `OIO_MAX_TOKEN_BUDGET` | `8192` | Token budget cap |

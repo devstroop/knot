@@ -25,7 +25,9 @@ Top-level milestone plan.
 
 ## Open decisions (next rounds)
 
-- GPU enablement (ort CUDA EP) timing
+- GPU timing (CUDA vs CPU measurements) — the ort CUDA EP itself landed
+  behind `OIO_DEVICE=cuda` (SPEC §10); the numbers still owe a GPU runner run
 
 Resolved: fixture format + export script → ADR-005; one binary vs two →
-ADR-004; model cache layout → SPEC §9 (resolution order, `SHA256SUMS`).
+ADR-004; model cache layout → SPEC §9 (resolution order, `SHA256SUMS`);
+device selection → SPEC §10 (explicit `cpu|cuda`, fail-fast).
