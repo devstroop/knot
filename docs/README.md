@@ -11,6 +11,7 @@ level per working round.
 | [COMPAT.md](COMPAT.md) | Jev/Laya compatibility contract, porting notes | Wire semantics or diffs change |
 | [JEV-WIRE.md](JEV-WIRE.md) | Reference notes: what Laya's wire code actually does (evidence for COMPAT) | Laya reference behaviour is re-read |
 | [RESEARCH-COMPARE.md](RESEARCH-COMPARE.md) | Evidence: recorded Jev vs Laya vs oio wire, serve deltas, quality/latency numbers, scope ranking | New research evidence lands or gaps move |
+| [DEMO.md](DEMO.md) | Generated three-way run report: Jev recorded/published vs Laya vs oio over the English/feishu/Hindi corpora | `scripts/demo.sh` re-runs (raw evidence in `demo/results.json`) |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Crate layout, one `predict()` data flow, `Runtime` trait | Crates/layers reorganize |
 | [ADR/](ADR/) | Why decisions were made (append-only) | New decision taken |
 

@@ -1,1 +1,4 @@
 /target
+.venv-demo/
+demo/logs/
+__pycache__/
