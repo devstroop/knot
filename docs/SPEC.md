@@ -147,3 +147,30 @@ components are rejected. A mismatch or missing file is a `Model` error
 `snapshot_revision` returning `None` for hand-copied weights. Fetching and
 manifest creation are explicit operator steps; inference never touches the
 network (PRD N4).
+
+## 10. Device (execution provider)
+
+`OIO_DEVICE=cpu|cuda`, default `cpu`. The value is the device every
+checkpoint actually loads onto — there is no auto-selection and no silent
+downgrade (PRD §4).
+
+- `cpu` — the baseline path: any build, any machine.
+- `cuda` — ort's CUDA execution provider, behind the `cuda` feature
+  (`cargo build -p oio-serve --features cuda`). ONNX Runtime 1.28's CUDA
+  build ships CUDA 13 binaries: Turing (sm_75) or newer GPU, driver
+  r580+, cuDNN 9, ~2 GB VRAM. Requesting `cuda` on a build without the
+  feature is a startup error naming the feature — never a CPU fallback.
+- `OIO_RUNTIME=candle` together with `OIO_DEVICE=cuda` is a startup
+  error: the CUDA path is ort's, the candle runtime is native CPU
+  (ADR-001).
+- Any failure while bringing the provider up (library missing, driver too
+  old, no GPU) is a load-time `Model` error: process exit at startup, 500
+  on a later reload. oio fails fast rather than computing on the CPU
+  unnoticed (PRD §4).
+- `/health` detail reports the configured device: `checkpoint_devices` is
+  that value per resident name; `device` is the first resident's value,
+  or the configured value while nothing is resident; and
+  `device_is_preference` is `true` exactly while nothing is resident —
+  Laya's semantics (`laya/docs/http-api.md`). `cpu_fallbacks` stays
+  `{"count":0,"last_reason":null}`: there is no silent fallback to
+  count, a failed provider is an error (COMPAT).
