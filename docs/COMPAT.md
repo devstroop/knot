@@ -101,6 +101,25 @@ Laya/oio response are **different JSON** even to the same request:
 oio follows Laya in every row. Full evidence, serve-surface deltas and the
 quality/latency numbers: `docs/RESEARCH-COMPARE.md`.
 
+## HTTP surface parity (vs `laya-serve`)
+
+- `GET /health`: liveness `{"status":"ok"}` is always open; the bearer (or
+  no configured key) unlocks Laya's detail payload — `loaded`, `revisions`,
+  `device`, `device_is_preference`, `checkpoint_devices`, `cpu_fallbacks`,
+  in that order (`docs/http-api.md`). oio's values: `revisions` is the HF
+  snapshot etag the checkpoint was downloaded at (e.g. Laya's reviewed
+  `55cf4c4e…` for `convaiinnovations/laya`) or `null` for a hand-copied
+  directory — the same `null` Laya reports for a local path;
+  `checkpoint_devices` is `"cpu"` per resident name and `cpu_fallbacks` is
+  `{"count":0,"last_reason":null}` (oio has no other device, so no fallback
+  can ever occur).
+- Predict responses carry both timing headers Laya sends: `Server-Timing:
+  inference;dur=<ms>` and `X-Inference-Time-Ms: <ms>`.
+- `GET /models` is **oio's extension** — laya-serve has no such route
+  (`docs/http-api.md` lists only `/health`, `/v1/systemone`,
+  `/v1/systemone/batch`). Clients written against Jev/Laya never call it;
+  it exists for local introspection.
+
 ## Porting checklist for an existing client
 
 1. Repoint base URL to `oio-serve`.

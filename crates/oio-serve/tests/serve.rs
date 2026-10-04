@@ -325,6 +325,95 @@ async fn health_open_without_auth_when_key_set() {
     let (st, body, _) = call(app(config), "GET", "/health", json!({})).await;
     assert_eq!(st, 200);
     assert_eq!(body["status"], "ok");
+    // without the bearer: liveness only, no checkpoint names or hardware
+    assert_eq!(
+        body.as_object().map(|o| o.len()),
+        Some(1),
+        "unauth health must not leak detail: {body}"
+    );
+}
+
+#[tokio::test]
+async fn health_detail_payload_matches_laya_shape() {
+    let (st, body, _) = call(app(ServeConfig::default()), "GET", "/health", json!({})).await;
+    assert_eq!(st, 200);
+    let keys: Vec<&str> = body
+        .as_object()
+        .expect("object")
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            "status",
+            "loaded",
+            "revisions",
+            "device",
+            "device_is_preference",
+            "checkpoint_devices",
+            "cpu_fallbacks"
+        ],
+        "field order follows laya's /health"
+    );
+    assert_eq!(body["status"], json!("ok"));
+    assert_eq!(body["loaded"], json!(["english"]));
+    // stubs report no artifact commit — the local-path value, like laya
+    assert_eq!(body["revisions"], json!({"english": null}));
+    assert_eq!(body["device"], json!("cpu"));
+    assert_eq!(body["device_is_preference"], json!(false));
+    assert_eq!(body["checkpoint_devices"], json!({"english": "cpu"}));
+    assert_eq!(
+        body["cpu_fallbacks"],
+        json!({"english": {"count": 0, "last_reason": null}})
+    );
+}
+
+#[tokio::test]
+async fn predict_responses_carry_laya_timing_headers() {
+    let (st, _, headers) = call(
+        app(ServeConfig::default()),
+        "POST",
+        "/v1/systemone",
+        json!({"state": "s", "questions": simple_q()}),
+    )
+    .await;
+    assert_eq!(st, 200);
+    let timing = headers
+        .get("server-timing")
+        .expect("Server-Timing header")
+        .to_str()
+        .unwrap();
+    let dur = timing
+        .strip_prefix("inference;dur=")
+        .unwrap_or_else(|| panic!("Server-Timing shape: {timing}"));
+    dur.parse::<f64>().expect("dur is a number");
+    headers
+        .get("x-inference-time-ms")
+        .expect("X-Inference-Time-Ms header")
+        .to_str()
+        .unwrap()
+        .parse::<f64>()
+        .expect("milliseconds are a number");
+}
+
+#[tokio::test]
+async fn batch_responses_carry_laya_timing_headers() {
+    let (st, _, headers) = call(
+        app(ServeConfig::default()),
+        "POST",
+        "/v1/systemone/batch",
+        json!({"states": ["a"], "questions": simple_q()}),
+    )
+    .await;
+    assert_eq!(st, 200);
+    assert!(
+        headers
+            .get("server-timing")
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| v.starts_with("inference;dur="))
+    );
+    assert!(headers.get("x-inference-time-ms").is_some());
 }
 
 #[tokio::test]

@@ -52,15 +52,22 @@ Confirmed identical at `develop` (`3628821`), serve.py ↔ `oio-serve`:
 - Batch response `{"results": [...], "total_usage": {...}}`, the
   `min_confidence` gate, empty-questions short-circuit, compact UTF-8 body.
 
-Remaining deltas (ranked at the end of this file):
+Remaining deltas (ranked at the end of this file). Fixed since `3628821`:
+G1 health detail payload, G2 `Server-Timing` header (`X-Inference-Time-Ms`
+already existed), G5 `/models` documented as an oio extension.
 
-| | Delta | Laya | oio at `3628821` |
-|---|---|---|---|
-| G1 | `/health` detail payload | `revisions`, `checkpoint_devices`, `cpu_fallbacks` alongside `loaded`/`device` (`serve.py:755-796`, `docs/http-api.md`) | only `loaded`, `device` (hardcoded `"cpu"`), `device_is_preference` (`lib.rs:403-414`); unauth → `{"status":"ok"}` matches |
-| G2 | Latency headers | `Server-Timing: inference;dur=…`, `X-Inference-Time-Ms` on predict responses (`serve.py:884-885, 1009-1010`) | absent |
-| G3 | Batch call controls `batch_size`, `sort_by_length` | validated, wrong type/range → **422** (`serve.py:112, 266-291`) | parsed and silently ignored |
-| G4 | `lang_temperatures` | per-language temperature maps (`common.py:728`) | only the 3 per-type + per-bucket calibration (`runtime.rs:56-69`) |
-| G5 | `GET /models` | not part of laya-serve | present (`lib.rs:416-424`) — an oio extension, documented as such |
+| | Delta | Laya | oio at `3628821` | Status |
+|---|---|---|---|---|
+| G1 | `/health` detail payload | `revisions`, `checkpoint_devices`, `cpu_fallbacks` alongside `loaded`/`device` (`serve.py:755-796`, `docs/http-api.md`) | only `loaded`, `device` (hardcoded `"cpu"`), `device_is_preference` (`lib.rs`); unauth → `{"status":"ok"}` matches | fixed: full payload; `revisions` from the HF snapshot etag (the reviewed `55cf4c4e…` for `convaiinnovations/laya`), `null` for plain local dirs (Laya's own local-path value) |
+| G2 | Latency headers | `Server-Timing: inference;dur=…`, `X-Inference-Time-Ms` (`serve.py:884-885, 1009-1010`) | `X-Inference-Time-Ms` only | fixed: both headers on predict + batch |
+| G3 | Batch call controls `batch_size`, `sort_by_length` | validated, wrong type/range → **422** (`serve.py:112, 266-291`) | parsed and silently ignored | open (Step 3: validation + engine effect) |
+| G4 | `lang_temperatures` | per-language temperature maps (`common.py:728`) | only the 3 per-type + per-bucket calibration (`runtime.rs:56-69`) | open |
+| G5 | `GET /models` | not part of laya-serve | present (`lib.rs:416-424`) — an oio extension, documented as such | fixed: documented in COMPAT |
+
+Note on MCP status: laya's `laya_status` tool reports the device trio
+(`device`, `checkpoint_devices`, `device_is_preference`) that oio's own
+`oio_status` does not carry. `oio_status` is oio's tool, not a wire promise —
+recorded here for completeness, not as a compat gap.
 
 ## Quality and latency evidence
 

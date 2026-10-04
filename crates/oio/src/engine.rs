@@ -27,6 +27,32 @@ pub struct Checkpoint {
     pub runtime: std::sync::Arc<dyn Runtime>,
     pub max_len: usize,
     pub head_max_len: usize,
+    /// Artifact commit the checkpoint was downloaded at (Laya's
+    /// `loaded_revisions` value): the HF snapshot etag when the cache is
+    /// present, else `None` for a plain local directory.
+    pub revision: Option<String>,
+}
+
+/// Read the snapshot commit from a Hugging Face cache inside `model_dir`.
+/// Every file's `.metadata` first line carries the same etag — the commit
+/// the snapshot resolved to — so one file is enough; a directory without
+/// the cache (weights copied by hand) reports `None`, which is exactly what
+/// Laya's `loaded_revisions` returns for a local path.
+fn snapshot_revision(model_dir: &Path) -> Option<String> {
+    for rel in [
+        "download/rl_agent_config.json.metadata",
+        "download/model.safetensors.metadata",
+    ] {
+        let path = model_dir.join(".cache/huggingface").join(rel);
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let first = text.lines().next().unwrap_or("").trim();
+        if first.len() == 40 && first.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Some(first.to_string());
+        }
+    }
+    None
 }
 
 impl Checkpoint {
@@ -57,6 +83,7 @@ impl Checkpoint {
             runtime,
             max_len,
             head_max_len,
+            revision: snapshot_revision(model_dir),
         })
     }
 
@@ -87,6 +114,7 @@ impl Checkpoint {
             runtime,
             max_len,
             head_max_len,
+            revision: snapshot_revision(model_dir),
         })
     }
 }
@@ -184,6 +212,17 @@ impl Engine {
     /// Names of the checkpoints currently resident (LRU-bounded).
     pub fn resident(&self) -> Vec<&'static str> {
         self.checkpoints.lock().unwrap().keys().copied().collect()
+    }
+
+    /// Artifact commit for a resident checkpoint, keyed by name for the
+    /// `/health` payload; `None` when the checkpoint is not resident or its
+    /// directory carries no HF snapshot metadata.
+    pub fn revision(&self, name: &str) -> Option<String> {
+        self.checkpoints
+            .lock()
+            .unwrap()
+            .get(name)
+            .and_then(|c| c.revision.clone())
     }
 
     /// The checkpoint for `name`, touching the LRU and (re)loading it if it
@@ -739,5 +778,62 @@ impl Engine {
             routing: Routing::from(&decision),
             shortlist: None,
         })
+    }
+}
+
+#[cfg(test)]
+mod revision_tests {
+    use super::snapshot_revision;
+    use std::fs;
+
+    fn tmp_dir(tag: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("oio-revision-{tag}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join(".cache/huggingface/download")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn reads_snapshot_etag_from_hf_metadata() {
+        let dir = tmp_dir("etag");
+        fs::write(
+            dir.join(".cache/huggingface/download/rl_agent_config.json.metadata"),
+            "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851\n891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c\n1791049440.0834491\n",
+        )
+        .unwrap();
+        assert_eq!(
+            snapshot_revision(&dir).as_deref(),
+            Some("55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851")
+        );
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn falls_back_to_model_metadata_and_rejects_bad_values() {
+        let dir = tmp_dir("fallback");
+        fs::write(
+            dir.join(".cache/huggingface/download/model.safetensors.metadata"),
+            "e4e9ddf21a7b1903b7acffd8814ad4307bf63a67\n",
+        )
+        .unwrap();
+        assert_eq!(
+            snapshot_revision(&dir).as_deref(),
+            Some("e4e9ddf21a7b1903b7acffd8814ad4307bf63a67")
+        );
+        // Not a commit SHA (too short) -> None, like a plain local path.
+        fs::write(
+            dir.join(".cache/huggingface/download/model.safetensors.metadata"),
+            "55cf4c4e\n",
+        )
+        .unwrap();
+        assert_eq!(snapshot_revision(&dir), None);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn no_cache_reports_none() {
+        let dir = tmp_dir("nocache");
+        assert_eq!(snapshot_revision(&dir), None);
+        fs::remove_dir_all(&dir).ok();
     }
 }
