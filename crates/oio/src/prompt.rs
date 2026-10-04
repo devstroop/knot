@@ -293,6 +293,7 @@ pub struct PromptBuilder {
     cls_id: u32,
     sep_id: u32,
     mask_id: u32,
+    pad_id: u32,
     mask_token: String,
     question_cache: Mutex<HashMap<String, Vec<u32>>>,
 }
@@ -301,12 +302,28 @@ impl PromptBuilder {
     pub fn from_file(path: &str) -> Result<Self> {
         let tok = Tokenizer::from_file(path)
             .map_err(|e| Error::Model(format!("load tokenizer {path}: {e}")))?;
-        let cls_id = Self::first_present(&tok, &["[CLS]", "<s>", "<bos>"])
+        // Laya resolves specials through AutoTokenizer: the declarations in
+        // `tokenizer_config.json` / `special_tokens_map.json` beside the
+        // vocabulary win (`tok.cls_token_id`, `tok.sep_token_id`, …). String
+        // priority alone is wrong for a vocabulary that *contains* look-alike
+        // entries: mmBERT ships `<s>`/`</s>` as ordinary BPE tokens (ids 204 /
+        // 213) while the config declares `<bos>`/`<eos>` (2 / 1), so the
+        // candidate list framed every sequence with content tokens. Declare
+        // first, fall back to candidate strings only when nothing declares one.
+        let declared = Self::declared_special_tokens(path);
+        let pick = |key: &str, candidates: &[&str]| -> Option<u32> {
+            declared
+                .get(key)
+                .and_then(|t| tok.token_to_id(t))
+                .or_else(|| Self::first_present(&tok, candidates))
+        };
+        let cls_id = pick("cls_token", &["[CLS]", "<s>", "<bos>"])
             .ok_or_else(|| Error::Model("no CLS token found".into()))?;
-        let sep_id = Self::first_present(&tok, &["[SEP]", "</s>", "<eos>"])
+        let sep_id = pick("sep_token", &["[SEP]", "</s>", "<eos>"])
             .ok_or_else(|| Error::Model("no SEP token found".into()))?;
-        let mask_id = Self::first_present(&tok, &["[MASK]", "<mask>"])
+        let mask_id = pick("mask_token", &["[MASK]", "<mask>"])
             .ok_or_else(|| Error::Model("no MASK token found".into()))?;
+        let pad_id = pick("pad_token", &["[PAD]", "<pad>"]).unwrap_or(0);
         let mask_token = tok
             .id_to_token(mask_id)
             .unwrap_or_else(|| "[MASK]".into())
@@ -317,6 +334,7 @@ impl PromptBuilder {
             cls_id,
             sep_id,
             mask_id,
+            pad_id,
             mask_token,
             question_cache: Mutex::new(HashMap::new()),
         })
@@ -324,6 +342,50 @@ impl PromptBuilder {
 
     fn first_present(tok: &Tokenizer, candidates: &[&str]) -> Option<u32> {
         candidates.iter().find_map(|t| tok.token_to_id(t))
+    }
+
+    /// Special-token declarations beside a `tokenizer.json`:
+    /// `tokenizer_config.json` first, then `special_tokens_map.json` for keys
+    /// it leaves unset. Values are plain strings, or the map file's
+    /// `{"content": …}` form. Mirrors the sources AutoTokenizer reads.
+    fn declared_special_tokens(path: &str) -> HashMap<String, String> {
+        const KEYS: [&str; 5] = [
+            "cls_token",
+            "sep_token",
+            "mask_token",
+            "bos_token",
+            "eos_token",
+        ];
+        let mut out = HashMap::new();
+        let Some(dir) = std::path::Path::new(path).parent() else {
+            return out;
+        };
+        for name in ["tokenizer_config.json", "special_tokens_map.json"] {
+            let Ok(text) = std::fs::read_to_string(dir.join(name)) else {
+                continue;
+            };
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else {
+                continue;
+            };
+            let Some(obj) = v.as_object() else {
+                continue;
+            };
+            for key in KEYS {
+                if out.contains_key(key) {
+                    continue;
+                }
+                let value = match obj.get(key) {
+                    Some(serde_json::Value::String(s)) => s.clone(),
+                    Some(serde_json::Value::Object(o)) => match o.get("content") {
+                        Some(serde_json::Value::String(s)) => s.clone(),
+                        _ => continue,
+                    },
+                    _ => continue,
+                };
+                out.insert(key.to_string(), value);
+            }
+        }
+        out
     }
 
     fn encode_ids(&self, text: &str) -> Result<Vec<u32>> {
@@ -352,7 +414,7 @@ impl PromptBuilder {
     }
 
     pub fn pad_id(&self) -> u32 {
-        Self::first_present(&self.tok, &["[PAD]", "<pad>", "<pad>"]).unwrap_or(0)
+        self.pad_id
     }
 
     pub fn cls_id(&self) -> u32 {

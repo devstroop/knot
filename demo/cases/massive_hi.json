@@ -1,0 +1,474 @@
+{
+ "source": {
+  "dataset": "mteb/amazon_massive_intent",
+  "file": "test/hi.json.gz",
+  "url": "https://huggingface.co/datasets/mteb/amazon_massive_intent/resolve/main/test/hi.json.gz",
+  "sha256_of_gz": "0d5cdf273638aec039bc025130ffac000d33d58c9e96c908cc51444da524a8b0",
+  "rows_total": 2974,
+  "labels": 59,
+  "note": "First 100 rows verbatim (bench_local.py Part A, seed 13, n_options 20)."
+ },
+ "labels": [
+  "alarm_query",
+  "alarm_remove",
+  "alarm_set",
+  "audio_volume_down",
+  "audio_volume_mute",
+  "audio_volume_other",
+  "audio_volume_up",
+  "calendar_query",
+  "calendar_remove",
+  "calendar_set",
+  "cooking_recipe",
+  "datetime_convert",
+  "datetime_query",
+  "email_addcontact",
+  "email_query",
+  "email_querycontact",
+  "email_sendemail",
+  "general_greet",
+  "general_joke",
+  "general_quirky",
+  "iot_cleaning",
+  "iot_coffee",
+  "iot_hue_lightchange",
+  "iot_hue_lightdim",
+  "iot_hue_lightoff",
+  "iot_hue_lighton",
+  "iot_hue_lightup",
+  "iot_wemo_off",
+  "iot_wemo_on",
+  "lists_createoradd",
+  "lists_query",
+  "lists_remove",
+  "music_dislikeness",
+  "music_likeness",
+  "music_query",
+  "music_settings",
+  "news_query",
+  "play_audiobook",
+  "play_game",
+  "play_music",
+  "play_podcasts",
+  "play_radio",
+  "qa_currency",
+  "qa_definition",
+  "qa_factoid",
+  "qa_maths",
+  "qa_stock",
+  "recommendation_events",
+  "recommendation_locations",
+  "recommendation_movies",
+  "social_post",
+  "social_query",
+  "takeaway_order",
+  "takeaway_query",
+  "transport_query",
+  "transport_taxi",
+  "transport_ticket",
+  "transport_traffic",
+  "weather_query"
+ ],
+ "rows": [
+  {
+   "text": "मुझे इस सप्ताह सुबह पांच बजे जगा दो",
+   "label": "alarm_set"
+  },
+  {
+   "text": "बंद करो",
+   "label": "audio_volume_mute"
+  },
+  {
+   "text": "हमको गुलाबी ही चाहिए",
+   "label": "iot_hue_lightchange"
+  },
+  {
+   "text": "और अँधेरा छा गया",
+   "label": "iot_hue_lighton"
+  },
+  {
+   "text": "ओली शयनकक्ष में बत्तियाँ बंद कर दें",
+   "label": "iot_hue_lightoff"
+  },
+  {
+   "text": "यह गंदा है यहाँ कुछ आवाज़ उठाओ",
+   "label": "iot_cleaning"
+  },
+  {
+   "text": "हुवर को हॉल में चालाओ",
+   "label": "iot_cleaning"
+  },
+  {
+   "text": "मुझे अपनी स्क्रीन की चमक की स्थिति चाहिए",
+   "label": "general_quirky"
+  },
+  {
+   "text": "क्या चल रहा है ओली",
+   "label": "general_greet"
+  },
+  {
+   "text": "भारत में समय क्या है",
+   "label": "datetime_query"
+  },
+  {
+   "text": "olly मुझे जी. एम. टी. में समय बताओ",
+   "label": "datetime_convert"
+  },
+  {
+   "text": "मेरा सुबह सात बजे का अलार्म रद्द करो",
+   "label": "alarm_remove"
+  },
+  {
+   "text": "मैंने कौन से अलार्म सेट किए हैं",
+   "label": "alarm_query"
+  },
+  {
+   "text": "मुझे मेरे अलार्म के बारे में बताओ",
+   "label": "alarm_query"
+  },
+  {
+   "text": "मुझे अरिजीत सिंह के गाने पसंद है",
+   "label": "music_likeness"
+  },
+  {
+   "text": "रोशनी की चमक अधिक सेट करे",
+   "label": "iot_hue_lightup"
+  },
+  {
+   "text": "आज की तारीख बताओ",
+   "label": "datetime_query"
+  },
+  {
+   "text": "आज क्या तारीख है",
+   "label": "datetime_query"
+  },
+  {
+   "text": "क्या आप आज रात के खाने के लिए सूप ऑर्डर कर सकते हैं",
+   "label": "takeaway_order"
+  },
+  {
+   "text": "सप्ताह का पूर्वानुमान क्या है",
+   "label": "weather_query"
+  },
+  {
+   "text": "इस सप्ताह का मौसम क्या है",
+   "label": "weather_query"
+  },
+  {
+   "text": "मुझे इस सप्ताह का मौसम बताओ",
+   "label": "weather_query"
+  },
+  {
+   "text": "एक हंसी भेजो मेरे रास्ते",
+   "label": "general_joke"
+  },
+  {
+   "text": "ओली मुझे एक चुटकुला सुनाओ",
+   "label": "general_joke"
+  },
+  {
+   "text": "तारीख कितनी हैं",
+   "label": "datetime_query"
+  },
+  {
+   "text": "ले जाने के लिए एक खरीदारी करो",
+   "label": "takeaway_order"
+  },
+  {
+   "text": "मुझे यह गाना पसंद है",
+   "label": "music_likeness"
+  },
+  {
+   "text": "कृपया इसको फिर से चालू करो",
+   "label": "play_music"
+  },
+  {
+   "text": "रोशनी कम करें",
+   "label": "iot_hue_lightdim"
+  },
+  {
+   "text": "क्या वे takeaway प्रदान कर सकते हैं",
+   "label": "takeaway_query"
+  },
+  {
+   "text": "क्या वे डिलीवरी कर सकते हैं",
+   "label": "takeaway_query"
+  },
+  {
+   "text": "क्या वें घर deliver करते हैं",
+   "label": "takeaway_query"
+  },
+  {
+   "text": "ओली क्या वे घर deliver",
+   "label": "takeaway_query"
+  },
+  {
+   "text": "गुरुवार सुबह सात बजे उठना सेट करें",
+   "label": "alarm_set"
+  },
+  {
+   "text": "मुझे व्यापार से संबंधित कुछ ख़बरें बताओ",
+   "label": "news_query"
+  },
+  {
+   "text": "मुझे अंतरराष्ट्रीय समाचार बताओ",
+   "label": "news_query"
+  },
+  {
+   "text": "मेरी शास्त्रीय संगीत की प्लेलिस्ट चलाओ",
+   "label": "play_music"
+  },
+  {
+   "text": "मेरी प्लेलिस्ट चालू करें और कतार में तीसरा गाना बजाएं",
+   "label": "play_music"
+  },
+  {
+   "text": "वॉल्यूम म्यूट करो",
+   "label": "audio_volume_mute"
+  },
+  {
+   "text": "अभी क्या समय है",
+   "label": "datetime_query"
+  },
+  {
+   "text": "मेरे द्वारा अभी-अभी सेट किया गया अलार्म हटाएं",
+   "label": "alarm_remove"
+  },
+  {
+   "text": "आज का मौसम कैसा है",
+   "label": "weather_query"
+  },
+  {
+   "text": "क्या मुझे कल छाता लाना चाहिए",
+   "label": "weather_query"
+  },
+  {
+   "text": "मेरी रॉक लिस्ट से गाना चलाओ",
+   "label": "play_music"
+  },
+  {
+   "text": "मैं अभी भक्ति की तरह महसूस कर रहा हूँ आप कैसे हैं",
+   "label": "play_music"
+  },
+  {
+   "text": "olly मेरे पसंदीदा भक्ति प्लेयर से एक अच्छा गाना बजाओ",
+   "label": "play_music"
+  },
+  {
+   "text": "मैं तुम को नहीं सुन पा रहा हूँ",
+   "label": "audio_volume_up"
+  },
+  {
+   "text": "मैं तुम्हें बड़ी मुश्किल से सुन पा रहा हूँ",
+   "label": "audio_volume_up"
+  },
+  {
+   "text": "चलो रोशनी नीली है",
+   "label": "iot_hue_lightchange"
+  },
+  {
+   "text": "गोरखपुर के लिए आज का पूर्वानुमान क्या है",
+   "label": "weather_query"
+  },
+  {
+   "text": "अमेरिकी डॉलर से पाउंड स्टर्लिंग की विनिमय दर क्या है",
+   "label": "news_query"
+  },
+  {
+   "text": "किचन की लाइट्स को जला दो",
+   "label": "iot_hue_lighton"
+  },
+  {
+   "text": "वैक्यूम क्लीनर को स्टार्ट करो",
+   "label": "iot_cleaning"
+  },
+  {
+   "text": "वैक्यूम क्लीनर चालू करें",
+   "label": "iot_cleaning"
+  },
+  {
+   "text": "निर्वाणा की प्लेलिस्ट चलाओ",
+   "label": "play_music"
+  },
+  {
+   "text": "अरिजीत सिंह के गानों का फेरबदल करो",
+   "label": "play_music"
+  },
+  {
+   "text": "मौसम किस तरह का है बताओ",
+   "label": "weather_query"
+  },
+  {
+   "text": "इस समय नए साल की शाम कौन सा दिन है",
+   "label": "datetime_query"
+  },
+  {
+   "text": "कृपया एक और घंटे के लिए चुप रहें",
+   "label": "audio_volume_mute"
+  },
+  {
+   "text": "आज मत बोलो",
+   "label": "audio_volume_mute"
+  },
+  {
+   "text": "मुझे अब से दो दिनों में बार्सिलोना में मौसम बताओ",
+   "label": "weather_query"
+  },
+  {
+   "text": "मेरा प्लग अक्षम करें",
+   "label": "iot_wemo_off"
+  },
+  {
+   "text": "मेरा प्लग सक्षम करें",
+   "label": "iot_wemo_on"
+  },
+  {
+   "text": "सात साल वाले गाने बजाओ",
+   "label": "play_music"
+  },
+  {
+   "text": "पटना में मौसम की स्थिति क्या है",
+   "label": "weather_query"
+  },
+  {
+   "text": "मैं सैन फ्रांसिस्को में मौसम जानना चाहता हूं",
+   "label": "weather_query"
+  },
+  {
+   "text": "क्या कल बारिश होगी",
+   "label": "weather_query"
+  },
+  {
+   "text": "क्या कल वर्षा होगी",
+   "label": "weather_query"
+  },
+  {
+   "text": "पहली अप्रैल को सप्ताह का कौन सा दिन होगा",
+   "label": "datetime_query"
+  },
+  {
+   "text": "वर्तमान समय क्या है",
+   "label": "datetime_query"
+  },
+  {
+   "text": "अनिरुद्ध के गाने का दूसरा गाना बजाएं",
+   "label": "play_music"
+  },
+  {
+   "text": "कृपया मुझे ताजा खबर बताओ",
+   "label": "news_query"
+  },
+  {
+   "text": "बत्तियाँ बंद करना",
+   "label": "iot_hue_lightoff"
+  },
+  {
+   "text": "मैं संगीत को save करना चाहता हूँ क्या तुम ये मेरे लिए कर सकते हो",
+   "label": "music_likeness"
+  },
+  {
+   "text": "भारत के समय में सनसनीखेज क्या है",
+   "label": "news_query"
+  },
+  {
+   "text": "स्मार्ट प्लग चालू करें",
+   "label": "iot_wemo_on"
+  },
+  {
+   "text": "मेरी प्लेलिस्ट से एक कोई भी गाना चलाओ",
+   "label": "play_music"
+  },
+  {
+   "text": "मेरी प्लेलिस्ट में एक भक्ति गाना चलाओ",
+   "label": "play_music"
+  },
+  {
+   "text": "सोनू निगम का कोई गाना चालू करें",
+   "label": "play_music"
+  },
+  {
+   "text": "पहला अलार्म हटाएं",
+   "label": "alarm_remove"
+  },
+  {
+   "text": "बजाना शुरू करो",
+   "label": "play_music"
+  },
+  {
+   "text": "क्या आप अगले घंटे के लिए रॉक संगीत चला सकते हैं",
+   "label": "play_music"
+  },
+  {
+   "text": "क्या आप मुझे एक चुटकुला बता सकते हैं",
+   "label": "general_joke"
+  },
+  {
+   "text": "मुझे एक मज़ेदार चुटकुला सुनाओ",
+   "label": "general_joke"
+  },
+  {
+   "text": "ताजा खबर क्या है",
+   "label": "news_query"
+  },
+  {
+   "text": "एक प्लग सॉकेट को पावर दें",
+   "label": "iot_wemo_on"
+  },
+  {
+   "text": "स्नानघर में बत्तियाँ बंद करें",
+   "label": "iot_hue_lightoff"
+  },
+  {
+   "text": "स्नानघर की लाइट बंद करें",
+   "label": "iot_hue_lightoff"
+  },
+  {
+   "text": "अभी का मौसम कैसा है",
+   "label": "weather_query"
+  },
+  {
+   "text": "अरिजीत सिंह का फोल्डर खोलो",
+   "label": "play_music"
+  },
+  {
+   "text": "ताजा समाचारों की सुर्खियां क्या हैं",
+   "label": "news_query"
+  },
+  {
+   "text": "समाचार में क्या हो रहा है",
+   "label": "news_query"
+  },
+  {
+   "text": "वॉल्यूम बढ़ाएँ",
+   "label": "audio_volume_up"
+  },
+  {
+   "text": "कॉफ़ी मेकर को चलाओ",
+   "label": "iot_coffee"
+  },
+  {
+   "text": "मेरे लिए रिलायंस का नवीनतम स्टॉक मूल्य प्राप्त करें",
+   "label": "news_query"
+  },
+  {
+   "text": "शयनकक्ष की बत्तियों को हरे रंग में बदलें",
+   "label": "iot_hue_lightchange"
+  },
+  {
+   "text": "प्रकाश को कम में बदलो",
+   "label": "iot_hue_lightdim"
+  },
+  {
+   "text": "अरिजीत सिंह को चालू करो",
+   "label": "play_music"
+  },
+  {
+   "text": "आप आमतौर पर क्या गलतियाँ करते हैं",
+   "label": "general_quirky"
+  },
+  {
+   "text": "गीत का गायक कौन है",
+   "label": "music_query"
+  }
+ ]
+}

@@ -296,3 +296,51 @@ fn noul_criteria_keys_are_lowercased() {
         ]
     );
 }
+
+// Laya resolves specials through AutoTokenizer from the tokenizer config, not
+// by string priority. mmBERT's vocabulary contains `<s>`/`</s>` as ordinary
+// BPE tokens (204/213) while `tokenizer_config.json` declares
+// `cls_token: <bos>` / `sep_token: <eos>` (2/1): candidate-string priority
+// alone framed every multilingual sequence with content tokens, and the model
+// answered from a differently framed prompt (found by the demo harness).
+#[test]
+fn special_tokens_follow_tokenizer_config() {
+    let dir = std::env::temp_dir().join(format!("oio_prompt_spec_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let vocab = serde_json::json!({
+        "<pad>": 0u32, "<eos>": 1, "<bos>": 2, "<unk>": 3, "<mask>": 4,
+        "hello": 5, "<s>": 204, "</s>": 213,
+    });
+    let tok = serde_json::json!({
+        "version": "1.0",
+        "truncation": null,
+        "padding": null,
+        "added_tokens": [],
+        "normalizer": null,
+        "pre_tokenizer": null,
+        "post_processor": null,
+        "decoder": null,
+        "model": {"type": "WordLevel", "vocab": vocab, "unk_token": "<unk>"}
+    });
+    let tpath = dir.join("tokenizer.json");
+    std::fs::write(&tpath, tok.to_string()).unwrap();
+
+    // Declarations beside the vocabulary win over the look-alike entries.
+    std::fs::write(
+        dir.join("tokenizer_config.json"),
+        r#"{"cls_token": "<bos>", "sep_token": "<eos>", "mask_token": "<mask>", "pad_token": "<pad>"}"#,
+    )
+    .unwrap();
+    let b = PromptBuilder::from_file(tpath.to_str().unwrap()).unwrap();
+    assert_eq!(b.cls_id(), 2);
+    assert_eq!(b.sep_id(), 1);
+    assert_eq!(b.mask_id(), 4);
+    assert_eq!(b.pad_id(), 0);
+
+    // No config beside the vocabulary -> candidate-string fallback is unchanged.
+    std::fs::remove_file(dir.join("tokenizer_config.json")).unwrap();
+    let b = PromptBuilder::from_file(tpath.to_str().unwrap()).unwrap();
+    assert_eq!(b.cls_id(), 204);
+    assert_eq!(b.sep_id(), 213);
+    std::fs::remove_dir_all(&dir).ok();
+}
