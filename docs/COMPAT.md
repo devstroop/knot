@@ -110,9 +110,10 @@ quality/latency numbers: `docs/RESEARCH-COMPARE.md`.
   snapshot etag the checkpoint was downloaded at (e.g. Laya's reviewed
   `55cf4c4e…` for `convaiinnovations/laya`) or `null` for a hand-copied
   directory — the same `null` Laya reports for a local path;
-  `checkpoint_devices` is `"cpu"` per resident name and `cpu_fallbacks` is
-  `{"count":0,"last_reason":null}` (oio has no other device, so no fallback
-  can ever occur).
+  `checkpoint_devices` is the configured `OIO_DEVICE` per resident name
+  (`"cpu"` by default, `"cuda"` with a `cuda`-feature build — SPEC §10)
+  and `cpu_fallbacks` is `{"count":0,"last_reason":null}`: oio never falls
+  back silently — a device that cannot come up is a startup error.
 - Predict responses carry both timing headers Laya sends: `Server-Timing:
   inference;dur=<ms>` and `X-Inference-Time-Ms: <ms>`.
 - `/v1/systemone/batch` accepts Laya's batch call controls with Laya's
