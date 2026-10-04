@@ -1,10 +1,10 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 
 use oio::engine::Engine;
 use oio::router::{Router, normalise_name};
+use oio_serve::model::{default_cache_root, resolve_model_dirs};
 use oio_serve::{ServeConfig, build_app};
 
 fn env_bool(name: &str, default: bool) -> bool {
@@ -24,31 +24,6 @@ fn env_usize(name: &str, default: usize) -> usize {
     }
 }
 
-/// `OIO_MODELS=name=/path,name2=/path2`, or `OIO_MODEL_DIR` as shorthand for a
-/// single `english` checkpoint dir.
-fn model_dirs() -> Result<Vec<(String, PathBuf)>> {
-    if let Ok(spec) = std::env::var("OIO_MODELS") {
-        let mut out = Vec::new();
-        for part in spec.split(',') {
-            let part = part.trim();
-            if part.is_empty() {
-                continue;
-            }
-            let Some((name, path)) = part.split_once('=') else {
-                bail!("OIO_MODELS entry {part:?} must be name=/path");
-            };
-            out.push((name.trim().to_string(), PathBuf::from(path.trim())));
-        }
-        if !out.is_empty() {
-            return Ok(out);
-        }
-    }
-    if let Ok(dir) = std::env::var("OIO_MODEL_DIR") {
-        return Ok(vec![("english".into(), PathBuf::from(dir))]);
-    }
-    bail!("set OIO_MODELS=name=/path[,...] or OIO_MODEL_DIR")
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -57,11 +32,28 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let dirs = model_dirs()?;
+    let (source, dirs) = resolve_model_dirs(
+        std::env::var("OIO_MODELS").as_deref().ok(),
+        std::env::var("OIO_MODEL_DIR").as_deref().ok(),
+        Some(&default_cache_root()),
+    )?;
+    tracing::info!(
+        %source,
+        models = ?dirs.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(),
+        "checkpoints resolved"
+    );
+
     let mut router = Router::new();
     if let Ok(default) = std::env::var("OIO_DEFAULT_MODEL") {
         router.default = normalise_name(&default)
             .with_context(|| format!("invalid OIO_DEFAULT_MODEL {default:?}"))?;
+    } else if !dirs.iter().any(|(n, _)| n == "english") {
+        // SPEC §9: english is the fallback, but when it isn't loaded the
+        // fallback becomes the first resolved directory (if it's a known name).
+        if let Some(first) = dirs.first().and_then(|(n, _)| normalise_name(n).ok()) {
+            tracing::info!(model = first, "fallback default: english not loaded");
+            router.default = first;
+        }
     }
     router.max_loaded = env_usize("OIO_MAX_LOADED", router.max_loaded);
     router.auto_task_detection = env_bool("OIO_AUTO_TASK", false);

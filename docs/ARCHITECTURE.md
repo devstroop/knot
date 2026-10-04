@@ -77,6 +77,7 @@ pick the backend; `oio-serve` selects at runtime with `OIO_RUNTIME`.
 
 ## Config (`OIO_*`)
 
-`OIO_MODELS=name=/path,...` or `OIO_MODEL_DIR`, `OIO_DEFAULT_MODEL`,
-`OIO_MAX_LOADED`, `OIO_AUTO_TASK`, `OIO_API_KEY`, `OIO_MAX_CONCURRENT`,
-`OIO_MAX_TOKEN_BUDGET`, `OIO_HOST`, `OIO_PORT`, `OIO_RUNTIME=onnx|candle`.
+`OIO_MODELS=name=/path,...` or `OIO_MODEL_DIR`, `OIO_CACHE_DIR`,
+`OIO_DEFAULT_MODEL`, `OIO_MAX_LOADED`, `OIO_AUTO_TASK`, `OIO_API_KEY`,
+`OIO_MAX_CONCURRENT`, `OIO_MAX_TOKEN_BUDGET`, `OIO_HOST`, `OIO_PORT`,
+`OIO_RUNTIME=onnx|candle`.

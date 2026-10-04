@@ -11,6 +11,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 
 pub mod mcp;
+pub mod model;
 
 use oio::engine::Engine;
 use oio::error::Error;

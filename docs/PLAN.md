@@ -25,8 +25,7 @@ Top-level milestone plan.
 
 ## Open decisions (next rounds)
 
-- Model cache layout under `~/.cache/oio`
 - GPU enablement (ort CUDA EP) timing
 
 Resolved: fixture format + export script → ADR-005; one binary vs two →
-ADR-004.
+ADR-004; model cache layout → SPEC §9 (resolution order, `SHA256SUMS`).
