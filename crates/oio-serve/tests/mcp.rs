@@ -59,6 +59,7 @@ impl Predictor for Stub {
         &self,
         states: &[Value],
         template: SystemOneRequest,
+        _opts: oio::engine::BatchOpts,
     ) -> oio::Result<Vec<SystemOneResponse>> {
         Ok(states
             .iter()
@@ -335,4 +336,70 @@ fn mcp_shares_http_request_limits() {
     assert_eq!(r["result"]["isError"], true);
     let text = r["result"]["content"][0]["text"].as_str().unwrap();
     assert!(text.contains("state too large"), "{text}");
+}
+
+#[test]
+fn batch_tool_validates_batch_controls_like_laya_mcp() {
+    let p = predictor();
+    let bad_size = handle_message(
+        &p,
+        &json!({"jsonrpc": "2.0", "id": 40, "method": "tools/call",
+        "params": {"name": "oio_predict_batch", "arguments": {
+            "states": ["a"],
+            "questions": {"q": {"type": "choice", "instructions": "ok?", "criteria": {"yes": "y"}}},
+            "batch_size": 0,
+        }}}),
+    )
+    .unwrap();
+    assert_eq!(bad_size["result"]["isError"], json!(true));
+    let text = bad_size["result"]["content"][0]["text"].as_str().unwrap();
+    assert_eq!(text, "batch_size must be a positive integer, got 0");
+
+    let bad_bool = handle_message(
+        &p,
+        &json!({"jsonrpc": "2.0", "id": 41, "method": "tools/call",
+        "params": {"name": "oio_predict_batch", "arguments": {
+            "states": ["a"],
+            "questions": {"q": {"type": "choice", "instructions": "ok?", "criteria": {"yes": "y"}}},
+            "batch_size": true,
+        }}}),
+    )
+    .unwrap();
+    let text = bad_bool["result"]["content"][0]["text"].as_str().unwrap();
+    assert_eq!(text, "batch_size must be a positive integer, got True");
+
+    let bad_sort = handle_message(
+        &p,
+        &json!({"jsonrpc": "2.0", "id": 42, "method": "tools/call",
+        "params": {"name": "oio_predict_batch", "arguments": {
+            "states": ["a"],
+            "questions": {"q": {"type": "choice", "instructions": "ok?", "criteria": {"yes": "y"}}},
+            "sort_by_length": "yes",
+        }}}),
+    )
+    .unwrap();
+    assert_eq!(bad_sort["result"]["isError"], json!(true));
+    let text = bad_sort["result"]["content"][0]["text"].as_str().unwrap();
+    assert_eq!(text, "sort_by_length must be a boolean");
+
+    // Valid controls run.
+    let ok = handle_message(
+        &p,
+        &json!({"jsonrpc": "2.0", "id": 43, "method": "tools/call",
+        "params": {"name": "oio_predict_batch", "arguments": {
+            "states": ["a", "b"],
+            "questions": {"q": {"type": "choice", "instructions": "ok?", "criteria": {"yes": "y"}}},
+            "batch_size": 1,
+            "sort_by_length": true,
+        }}}),
+    )
+    .unwrap();
+    assert!(
+        ok.get("result")
+            .and_then(|r| r.get("isError"))
+            .is_none_or(|v| *v == json!(false))
+    );
+    let payload: Value =
+        serde_json::from_str(ok["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(payload["results"].as_array().unwrap().len(), 2);
 }

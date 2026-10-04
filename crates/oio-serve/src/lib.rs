@@ -42,6 +42,7 @@ pub trait Predictor: Send + Sync {
         &self,
         states: &[serde_json::Value],
         template: SystemOneRequest,
+        opts: oio::engine::BatchOpts,
     ) -> oio::Result<Vec<SystemOneResponse>>;
     fn loaded(&self) -> Vec<&'static str>;
     /// Artifact commit a resident checkpoint was loaded from — the
@@ -70,8 +71,9 @@ impl Predictor for Engine {
         &self,
         states: &[serde_json::Value],
         template: SystemOneRequest,
+        opts: oio::engine::BatchOpts,
     ) -> oio::Result<Vec<SystemOneResponse>> {
-        Engine::predict_batch(self, states, template)
+        Engine::predict_batch(self, states, template, opts)
     }
 
     fn loaded(&self) -> Vec<&'static str> {
@@ -315,6 +317,49 @@ fn validate_min_confidence(body: &serde_json::Value) -> std::result::Result<Opti
             )),
         },
     }
+}
+
+/// Laya's batch call controls (`serve.py` `_validate_batch_size_param` /
+/// `_validate_sort_by_length_param`): `batch_size` must be a positive
+/// integer, `sort_by_length` a boolean; both accept `null` as "not set",
+/// each failure a 422 carrying Laya's exact wording. `false` arrives as
+/// "the caller did not ask" — Laya only forwards `True` too.
+#[allow(clippy::result_large_err)]
+fn batch_opts(body: &serde_json::Value) -> std::result::Result<oio::engine::BatchOpts, Response> {
+    let batch_size = match body.get("batch_size") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(v) => match v.as_i64() {
+            Some(n) if n >= 1 => Some(n as usize),
+            Some(n) => {
+                return Err(json_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    format!("batch_size must be a positive integer, got {n}"),
+                ));
+            }
+            None => {
+                return Err(json_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "batch_size must be an integer",
+                ));
+            }
+        },
+    };
+    let sort_by_length = match body.get("sort_by_length") {
+        None | Some(serde_json::Value::Null) => false,
+        Some(v) => match v.as_bool() {
+            Some(b) => b,
+            None => {
+                return Err(json_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "sort_by_length must be a boolean",
+                ));
+            }
+        },
+    };
+    Ok(oio::engine::BatchOpts {
+        batch_size,
+        sort_by_length,
+    })
 }
 
 fn map_error(e: Error) -> Response {
@@ -649,6 +694,7 @@ async fn systemone_batch(
         }
         check_refusals(&body)?;
         let controls = parse_controls(&body, state.config.max_token_budget)?;
+        let batch_opts = batch_opts(&body)?;
 
         let gate = state.gate.clone();
         let predictor = state.predictor.clone();
@@ -673,7 +719,7 @@ async fn systemone_batch(
                 min_confidence: None,
             };
             let inference = tokio::task::spawn_blocking(move || {
-                predictor.predict_batch(&states_clone, template)
+                predictor.predict_batch(&states_clone, template, batch_opts)
             })
             .await
             .map_err(|_| json_error(StatusCode::INTERNAL_SERVER_ERROR, "inference failed"))?;

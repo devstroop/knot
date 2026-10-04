@@ -22,7 +22,17 @@ these changes, update this file in the same change.
   `noul: {noul, confidence, answer_confidence}`.
 - `confidence` = 1 − normalized entropy (matches Laya, **not** Jev's formula).
 - `answer_confidence` = probability of the reported answer. Gate on this.
-- Batch: `POST /v1/systemone/batch`, `states[]` with length ≤ 64.
+- Batch: `POST /v1/systemone/batch`, `states[]` with length ≤ 64. Call
+  controls validate like Laya's (`serve.py`): `batch_size` must be a
+  positive integer (else 422, `"batch_size must be an integer"` or
+  `"batch_size must be a positive integer, got N"`), `sort_by_length` must
+  be a boolean (else 422, `"sort_by_length must be a boolean"`); `null` is
+  "not set". `batch_size` caps states per forward pass (default: the whole
+  group); `sort_by_length` stably sorts states by encoded length within
+  windows of `8 × batch_size` before chunking, and only when
+  `1 < batch_size < len(states)` — results always come back in input order.
+  The MCP batch tool accepts and validates the same two arguments with
+  Laya's MCP wording (`"batch_size must be a positive integer, got …"`).
 - Predict responses carry both timing headers, Laya's pair: `Server-Timing:
   inference;dur=<ms>` and `X-Inference-Time-Ms: <ms>` (2 decimals, inference
   time only — gate wait excluded).

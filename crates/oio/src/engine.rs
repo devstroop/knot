@@ -168,6 +168,51 @@ struct ItemAcc {
     input_tokens: usize,
 }
 
+/// Call controls for one `predict_batch` (Laya's `batch_size` /
+/// `sort_by_length` kwargs). `Default` is Laya's own default: one forward
+/// pass for the whole group, original order.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct BatchOpts {
+    pub batch_size: Option<usize>,
+    pub sort_by_length: bool,
+}
+
+/// Laya's chunk plan (`agent.py` `predict_batch` loop): the states of one
+/// model group, split into forward-pass batches in execution order.
+///
+/// - `batch_size` bounds states per pass (`None` / `0` → all of them);
+/// - `sort_by_length` stably sorts states by encoded length inside windows
+///   of `8 × batch_size`, and only when `1 < batch_size < n` — otherwise
+///   the flag has no effect, exactly as the docstring promises;
+/// - membership, not output order: results are written back to their input
+///   positions, so a caller always sees input order.
+pub(crate) fn batch_chunks(n: usize, opts: BatchOpts, lens: &[usize]) -> Vec<Vec<usize>> {
+    debug_assert_eq!(lens.len(), n);
+    if n == 0 {
+        return Vec::new();
+    }
+    let chunk = opts.batch_size.filter(|&c| c > 0).unwrap_or(n);
+    let reorder = opts.sort_by_length && chunk > 1 && chunk < n;
+    let window = if reorder { chunk * 8 } else { chunk };
+    let mut out = Vec::new();
+    let mut w_start = 0;
+    while w_start < n {
+        let w_end = (w_start + window).min(n);
+        let mut order: Vec<usize> = (w_start..w_end).collect();
+        if reorder {
+            order.sort_by_key(|&i| lens[i]);
+        }
+        let mut c_start = 0;
+        while c_start < order.len() {
+            let c_end = (c_start + chunk).min(order.len());
+            out.push(order[c_start..c_end].to_vec());
+            c_start = c_end;
+        }
+        w_start = w_end;
+    }
+    out
+}
+
 /// Round to 4 decimals like Laya's answer builder.
 fn r4(v: f32) -> f32 {
     (v * 10_000.0).round() / 10_000.0
@@ -307,7 +352,7 @@ impl Engine {
             return Ok(Self::empty_response(&item));
         }
         let ckpt = self.checkpoint(item.decision.model)?;
-        let mut out = self.run_group(&ckpt, &[&item])?;
+        let mut out = self.run_group(&ckpt, &[&item], BatchOpts::default())?;
         Ok(out.pop().expect("one response per item"))
     }
 
@@ -335,7 +380,12 @@ impl Engine {
     /// per-item answers/usage. `predict` is the n = 1 case; `predict_batch`
     /// groups all its states by routed model so N states cost one forward
     /// pass per model (Laya `predict_batch`'s collation property).
-    fn run_group(&self, ckpt: &Checkpoint, items: &[&Item]) -> Result<Vec<SystemOneResponse>> {
+    fn run_group(
+        &self,
+        ckpt: &Checkpoint,
+        items: &[&Item],
+        opts: BatchOpts,
+    ) -> Result<Vec<SystemOneResponse>> {
         struct Row {
             item: usize,
             qid: String,
@@ -410,153 +460,179 @@ impl Engine {
             }
         }
 
-        // Collate: pad to max row length / max marker count (Laya `collate_items`).
-        let n = rows.len();
-        let lmax = rows.iter().map(|r| r.ids.len()).max().unwrap_or(0);
-        let kmax = rows.iter().map(|r| r.markers.len()).max().unwrap_or(0);
-        let pad_id = ckpt.builder.pad_id() as i64;
-        let mut input_ids = vec![pad_id; n * lmax];
-        let mut att = vec![0i64; n * lmax];
-        let mut mpos = vec![0i64; n * kmax];
-        let mut mmask = vec![false; n * kmax];
-        let mut qtype = vec![0i64; n];
-        for (i, r) in rows.iter().enumerate() {
-            for (j, &id) in r.ids.iter().enumerate() {
-                input_ids[i * lmax + j] = id as i64;
-                att[i * lmax + j] = 1;
-            }
-            for (j, &m) in r.markers.iter().enumerate() {
-                mpos[i * kmax + j] = m as i64;
-                mmask[i * kmax + j] = true;
-            }
-            qtype[i] = r.qtype;
+        // Per-item bookkeeping: which rows belong to each state, and the
+        // post-truncation length laya sorts by (max row length per state).
+        let mut item_rows: Vec<Vec<usize>> = vec![Vec::new(); items.len()];
+        let mut item_len: Vec<usize> = vec![0; items.len()];
+        for (ri, r) in rows.iter().enumerate() {
+            item_rows[r.item].push(ri);
+            item_len[r.item] = item_len[r.item].max(r.ids.len());
         }
-
-        let (logits, act) = ckpt
-            .runtime
-            .forward(&input_ids, &att, &mpos, &mmask, &qtype, n, lmax, kmax)?;
-
-        // Decode answers per row, accumulated per item.
         let mut acc: Vec<ItemAcc> = (0..items.len()).map(|_| ItemAcc::default()).collect();
-        for (i, r) in rows.iter().enumerate() {
-            let k = r.markers.len();
-            let qtype_name = match r.qtype {
-                0 => "choice",
-                1 => "score",
-                _ => "noul",
-            };
-            let t = ckpt
+
+        // Laya's chunk plan: windows of 8 × chunk when reordering, a stable
+        // length sort inside each window, forward passes of at most `chunk`
+        // states (Laya `collate_items` per chunk). Collating per chunk is
+        // what bounds padding; batch shapes may shift floats slightly — the
+        // trade laya documents for `sort_by_length`.
+        for group in batch_chunks(items.len(), opts, &item_len) {
+            let chunk_row_indices: Vec<usize> = group
+                .iter()
+                .flat_map(|&i| item_rows[i].iter().copied())
+                .collect();
+            let chunk_rows: Vec<&Row> = chunk_row_indices.iter().map(|&ri| &rows[ri]).collect();
+
+            // Collate: pad to this chunk's max row length / marker count.
+            let n = chunk_rows.len();
+            let lmax = chunk_rows.iter().map(|r| r.ids.len()).max().unwrap_or(0);
+            let kmax = chunk_rows
+                .iter()
+                .map(|r| r.markers.len())
+                .max()
+                .unwrap_or(0);
+            let pad_id = ckpt.builder.pad_id() as i64;
+            let mut input_ids = vec![pad_id; n * lmax];
+            let mut att = vec![0i64; n * lmax];
+            let mut mpos = vec![0i64; n * kmax];
+            let mut mmask = vec![false; n * kmax];
+            let mut qtype = vec![0i64; n];
+            for (i, r) in chunk_rows.iter().enumerate() {
+                for (j, &id) in r.ids.iter().enumerate() {
+                    input_ids[i * lmax + j] = id as i64;
+                    att[i * lmax + j] = 1;
+                }
+                for (j, &m) in r.markers.iter().enumerate() {
+                    mpos[i * kmax + j] = m as i64;
+                    mmask[i * kmax + j] = true;
+                }
+                qtype[i] = r.qtype;
+            }
+
+            let (logits, act) = ckpt
                 .runtime
-                .calibration()
-                .for_question(qtype_name, r.qtype as usize, k);
-            let p_slot = scaled_softmax(&logits[i][..k], t);
-            // `build_sequence` put option `order[s]` in slot `s`, so the model
-            // row comes back slot-indexed; downstream (keys, level index,
-            // noul-true) all index by option — same as Laya's unpermute_probs.
-            let p = match &r.order {
-                Some(order) if order.len() == p_slot.len() => {
-                    let mut out = vec![0.0f32; p_slot.len()];
-                    for (slot, &opt) in order.iter().enumerate() {
-                        out[opt] = p_slot[slot];
-                    }
-                    out
-                }
-                _ => p_slot,
-            };
-            let ans_conf = answer_confidence(&p);
-            // Laya softmaxes the act head before exposing slot 0
-            // (onnx_agent: act = softmax(act_logits); ext act_probability = act[0]).
-            let act_p = scaled_softmax(&act[i], 1.0);
-            let act_prob = r4(act_p[0]);
+                .forward(&input_ids, &att, &mpos, &mmask, &qtype, n, lmax, kmax)?;
 
-            let answer = match qtype_name {
-                "choice" => {
-                    let keys: Vec<String> = match &items[r.item].questions[&r.qid].crit {
-                        Some(serde_json::Value::Object(m)) => m.keys().cloned().collect(),
-                        _ => Vec::new(),
-                    };
-                    let best = p
-                        .iter()
-                        .enumerate()
-                        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-                        .map(|(i, _)| i)
-                        .unwrap_or(0);
-                    let probs: IndexMap<String, f32> = keys
-                        .iter()
-                        .enumerate()
-                        .map(|(j, kk)| (kk.clone(), r4(p[j])))
-                        .collect();
-                    Answer::Choice {
-                        choice: keys.get(best).cloned().unwrap_or_default(),
-                        probabilities: probs,
-                        confidence: r4(confidence_from_probs(&p)),
-                        answer_confidence: r4(ans_conf),
-                        action: Action {
-                            act_probability: act_prob,
-                        },
-                        window: None,
-                    }
-                }
-                "score" => {
-                    let crits: Vec<String> = match &items[r.item].questions[&r.qid].crit {
-                        Some(serde_json::Value::Array(a)) => {
-                            a.iter().map(render_criterion).collect()
+            // Decode answers per row of this chunk, accumulated per item.
+            for (i, r) in chunk_rows.iter().enumerate() {
+                let k = r.markers.len();
+                let qtype_name = match r.qtype {
+                    0 => "choice",
+                    1 => "score",
+                    _ => "noul",
+                };
+                let t = ckpt
+                    .runtime
+                    .calibration()
+                    .for_question(qtype_name, r.qtype as usize, k);
+                let p_slot = scaled_softmax(&logits[i][..k], t);
+                // `build_sequence` put option `order[s]` in slot `s`, so the model
+                // row comes back slot-indexed; downstream (keys, level index,
+                // noul-true) all index by option — same as Laya's unpermute_probs.
+                let p = match &r.order {
+                    Some(order) if order.len() == p_slot.len() => {
+                        let mut out = vec![0.0f32; p_slot.len()];
+                        for (slot, &opt) in order.iter().enumerate() {
+                            out[opt] = p_slot[slot];
                         }
-                        _ => Vec::new(),
-                    };
-                    let exp: f32 = p.iter().enumerate().map(|(j, &v)| j as f32 * v).sum();
-                    let legend = crits
-                        .iter()
-                        .enumerate()
-                        .map(|(j, c)| (j.to_string(), c.clone()))
-                        .collect::<IndexMap<String, String>>();
-                    let probs: IndexMap<String, f32> = p
-                        .iter()
-                        .enumerate()
-                        .map(|(j, &v)| (j.to_string(), r4(v)))
-                        .collect();
-                    Answer::Score {
-                        score: r4(exp),
-                        legend,
-                        probabilities: probs,
-                        confidence: r4(confidence_from_probs(&p)),
+                        out
+                    }
+                    _ => p_slot,
+                };
+                let ans_conf = answer_confidence(&p);
+                // Laya softmaxes the act head before exposing slot 0
+                // (onnx_agent: act = softmax(act_logits); ext act_probability = act[0]).
+                let act_p = scaled_softmax(&act[i], 1.0);
+                let act_prob = r4(act_p[0]);
+
+                let answer = match qtype_name {
+                    "choice" => {
+                        let keys: Vec<String> = match &items[r.item].questions[&r.qid].crit {
+                            Some(serde_json::Value::Object(m)) => m.keys().cloned().collect(),
+                            _ => Vec::new(),
+                        };
+                        let best = p
+                            .iter()
+                            .enumerate()
+                            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                            .map(|(i, _)| i)
+                            .unwrap_or(0);
+                        let probs: IndexMap<String, f32> = keys
+                            .iter()
+                            .enumerate()
+                            .map(|(j, kk)| (kk.clone(), r4(p[j])))
+                            .collect();
+                        Answer::Choice {
+                            choice: keys.get(best).cloned().unwrap_or_default(),
+                            probabilities: probs,
+                            confidence: r4(confidence_from_probs(&p)),
+                            answer_confidence: r4(ans_conf),
+                            action: Action {
+                                act_probability: act_prob,
+                            },
+                            window: None,
+                        }
+                    }
+                    "score" => {
+                        let crits: Vec<String> = match &items[r.item].questions[&r.qid].crit {
+                            Some(serde_json::Value::Array(a)) => {
+                                a.iter().map(render_criterion).collect()
+                            }
+                            _ => Vec::new(),
+                        };
+                        let exp: f32 = p.iter().enumerate().map(|(j, &v)| j as f32 * v).sum();
+                        let legend = crits
+                            .iter()
+                            .enumerate()
+                            .map(|(j, c)| (j.to_string(), c.clone()))
+                            .collect::<IndexMap<String, String>>();
+                        let probs: IndexMap<String, f32> = p
+                            .iter()
+                            .enumerate()
+                            .map(|(j, &v)| (j.to_string(), r4(v)))
+                            .collect();
+                        Answer::Score {
+                            score: r4(exp),
+                            legend,
+                            probabilities: probs,
+                            confidence: r4(confidence_from_probs(&p)),
+                            answer_confidence: r4(ans_conf),
+                            action: Action {
+                                act_probability: act_prob,
+                            },
+                            window: None,
+                        }
+                    }
+                    _ => Answer::Noul {
+                        noul: r4(p[1]),
+                        confidence: r4(p[1].max(1.0 - p[1])),
                         answer_confidence: r4(ans_conf),
                         action: Action {
                             act_probability: act_prob,
                         },
                         window: None,
-                    }
-                }
-                _ => Answer::Noul {
-                    noul: r4(p[1]),
-                    confidence: r4(p[1].max(1.0 - p[1])),
-                    answer_confidence: r4(ans_conf),
-                    action: Action {
-                        act_probability: act_prob,
                     },
-                    window: None,
-                },
-            };
-            acc[r.item].answers.insert(r.qid.clone(), answer);
+                };
+                acc[r.item].answers.insert(r.qid.clone(), answer);
 
-            let a = &mut acc[r.item];
-            a.dropped_max = a.dropped_max.max(r.state_stats.state_tokens_dropped);
-            a.state_tokens = a.state_tokens.max(r.state_stats.state_tokens);
-            if r.state_stats.truncated {
-                a.truncated_questions.push(r.qid.clone());
+                let a = &mut acc[r.item];
+                a.dropped_max = a.dropped_max.max(r.state_stats.state_tokens_dropped);
+                a.state_tokens = a.state_tokens.max(r.state_stats.state_tokens);
+                if r.state_stats.truncated {
+                    a.truncated_questions.push(r.qid.clone());
+                }
+                if r.options_stats.options_distinct < r.options_stats.options {
+                    a.collapsed.insert(
+                        r.qid.clone(),
+                        serde_json::json!({
+                            "total": r.options_stats.options,
+                            "distinct": r.options_stats.options_distinct,
+                            "tokens_per_option": r.options_stats.tokens_per_option,
+                        }),
+                    );
+                }
+                acc[r.item].input_tokens += r.ids.len();
             }
-            if r.options_stats.options_distinct < r.options_stats.options {
-                a.collapsed.insert(
-                    r.qid.clone(),
-                    serde_json::json!({
-                        "total": r.options_stats.options,
-                        "distinct": r.options_stats.options_distinct,
-                        "tokens_per_option": r.options_stats.tokens_per_option,
-                    }),
-                );
-            }
-            acc[r.item].input_tokens += r.ids.len();
-        }
+        } // for group in batch_chunks
 
         acc.into_iter()
             .zip(items.iter())
@@ -588,12 +664,14 @@ impl Engine {
 
     /// Run the same request shape over a list of states, Laya `predict_batch`'s
     /// per-item result shape (one `SystemOneResponse` per state). States are
-    /// routed first, then grouped by checkpoint so each group is a single
-    /// collated forward pass instead of one pass per state.
+    /// routed first, then grouped by checkpoint; each group follows `opts`
+    /// (`batch_size` cap, `sort_by_length` windowed reorder) and still comes
+    /// back in input order.
     pub fn predict_batch(
         &self,
         states: &[serde_json::Value],
         template: SystemOneRequest,
+        opts: BatchOpts,
     ) -> Result<Vec<SystemOneResponse>> {
         let mut items: Vec<Item> = Vec::with_capacity(states.len());
         for state in states {
@@ -614,7 +692,7 @@ impl Engine {
         for (model, idxs) in by_model {
             let ckpt = self.checkpoint(model)?;
             let group: Vec<&Item> = idxs.iter().map(|&i| &items[i]).collect();
-            let responses = self.run_group(&ckpt, &group)?;
+            let responses = self.run_group(&ckpt, &group, opts)?;
             for (slot, resp) in idxs.into_iter().zip(responses) {
                 out[slot] = Some(resp);
             }
@@ -695,6 +773,7 @@ impl Engine {
                 state: serde_json::Value::Null,
                 ..req.clone()
             },
+            BatchOpts::default(),
         )?;
 
         let mut answers: IndexMap<String, Answer> = IndexMap::new();
@@ -835,5 +914,145 @@ mod revision_tests {
         let dir = tmp_dir("nocache");
         assert_eq!(snapshot_revision(&dir), None);
         fs::remove_dir_all(&dir).ok();
+    }
+}
+
+#[cfg(test)]
+mod batch_plan_tests {
+    use super::{BatchOpts, batch_chunks};
+
+    #[test]
+    fn default_is_one_pass_for_the_whole_group() {
+        assert_eq!(
+            batch_chunks(4, BatchOpts::default(), &[10, 20, 30, 40]),
+            vec![vec![0, 1, 2, 3]]
+        );
+    }
+
+    #[test]
+    fn batch_size_splits_in_input_order_without_sorting() {
+        assert_eq!(
+            batch_chunks(
+                6,
+                BatchOpts {
+                    batch_size: Some(2),
+                    sort_by_length: false
+                },
+                &[10, 30, 20, 40, 5, 15]
+            ),
+            vec![vec![0, 1], vec![2, 3], vec![4, 5]]
+        );
+    }
+
+    #[test]
+    fn sort_by_length_reorders_stably_inside_one_window() {
+        // n=6, batch_size=2 -> window = 16 > 6: one window, sorted by length.
+        let chunks = batch_chunks(
+            6,
+            BatchOpts {
+                batch_size: Some(2),
+                sort_by_length: true,
+            },
+            &[10, 30, 20, 40, 5, 15],
+        );
+        // execution order: lengths 5,10,15,20,30,40 -> items 4,0,5,2,1,3
+        assert_eq!(chunks, vec![vec![4, 0], vec![5, 2], vec![1, 3]]);
+        // membership covers every state exactly once (input order is
+        // restored by the caller writing results to their positions)
+        let mut seen: Vec<usize> = chunks.concat();
+        seen.sort_unstable();
+        assert_eq!(seen, (0..6).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn sort_requires_explicit_batch_size_between_one_and_n() {
+        let lens = [10, 30, 20, 40, 5, 15];
+        // batch_size = 1: chunk > 1 fails -> no reorder
+        let c = batch_chunks(
+            6,
+            BatchOpts {
+                batch_size: Some(1),
+                sort_by_length: true,
+            },
+            &lens,
+        );
+        assert_eq!(
+            c,
+            vec![vec![0], vec![1], vec![2], vec![3], vec![4], vec![5]]
+        );
+        // batch_size = n: chunk < n fails -> no reorder
+        let c = batch_chunks(
+            6,
+            BatchOpts {
+                batch_size: Some(6),
+                sort_by_length: true,
+            },
+            &lens,
+        );
+        assert_eq!(c, vec![vec![0, 1, 2, 3, 4, 5]]);
+        // no batch_size: chunk = n -> no reorder
+        let c = batch_chunks(
+            6,
+            BatchOpts {
+                batch_size: None,
+                sort_by_length: true,
+            },
+            &lens,
+        );
+        assert_eq!(c, vec![vec![0, 1, 2, 3, 4, 5]]);
+    }
+
+    #[test]
+    fn large_batch_size_collapses_to_one_chunk_and_zero_is_absent() {
+        let lens = [1, 2];
+        assert_eq!(
+            batch_chunks(
+                2,
+                BatchOpts {
+                    batch_size: Some(100),
+                    sort_by_length: false
+                },
+                &lens
+            ),
+            vec![vec![0, 1]]
+        );
+        assert_eq!(
+            batch_chunks(
+                2,
+                BatchOpts {
+                    batch_size: Some(0),
+                    sort_by_length: false
+                },
+                &lens
+            ),
+            vec![vec![0, 1]]
+        );
+        assert!(batch_chunks(0, BatchOpts::default(), &[]).is_empty());
+    }
+
+    #[test]
+    fn sort_windows_are_eight_chunks() {
+        // n=40, batch_size=2 -> window = 8 × 2 = 16 items: [0..16), [16..32),
+        // [32..40). Ascending sort by length; lens decrease as i grows, so
+        // each window orders high indices first.
+        let lens: Vec<usize> = (0..40).map(|i| 100 - i).collect();
+        let chunks = batch_chunks(
+            40,
+            BatchOpts {
+                batch_size: Some(2),
+                sort_by_length: true,
+            },
+            &lens,
+        );
+        assert_eq!(chunks.len(), 20);
+        // window 1 = chunks 0..8: shortest in [0..16) is 15, then 14
+        assert_eq!(chunks[0], vec![15, 14]);
+        // window 2 = chunks 8..16: shortest in [16..32) is 31, then 30
+        assert_eq!(chunks[8], vec![31, 30]);
+        // window 3 = chunks 16..20: shortest in [32..40) is 39, then 38
+        assert_eq!(chunks[16], vec![39, 38]);
+        // windows never mix: last window starts at 32's region only
+        let last: Vec<usize> = chunks[16..].concat();
+        assert!(last.iter().all(|&i| (32..40).contains(&i)));
     }
 }
