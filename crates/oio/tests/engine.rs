@@ -97,7 +97,11 @@ fn engine_matches_laya_predict() {
     };
     let single_b = engine.predict(&req_b).unwrap();
     let batch = engine
-        .predict_batch(&[req.state.clone(), state_b], req.clone())
+        .predict_batch(
+            &[req.state.clone(), state_b],
+            req.clone(),
+            oio::engine::BatchOpts::default(),
+        )
         .unwrap();
     assert_eq!(batch.len(), 2);
     assert_same_answers(&batch[0].answers, &res.answers, "item 0");
@@ -309,7 +313,11 @@ fn empty_questions_returns_laya_empty_shape() {
     );
 
     let batch = engine
-        .predict_batch(&[serde_json::json!("hello")], req.clone())
+        .predict_batch(
+            &[serde_json::json!("hello")],
+            req.clone(),
+            oio::engine::BatchOpts::default(),
+        )
         .unwrap();
     assert_eq!(batch.len(), 1);
     assert!(batch[0].answers.is_empty());

@@ -29,13 +29,28 @@ oio is a Rust implementation of the same decision-engine inference path, exposed
 | Extensibility | `Runtime` trait: ONNX first, candle native later, own kernels after |
 | License/cost | Apache-2.0, zero per-token cost, CPU baseline, GPU later via ort CUDA EP |
 
-## 4. Non-goals (v1)
+## 4. Non-goals (out of scope)
 
-- Training / fine-tuning, RLCD, calibration fitting (consume Laya's artifacts)
-- TileLang fast kernels, torch.compile path
-- LangChain/LlamaIndex/CrewAI integrations (Laya keeps them)
-- GPU fast paths, WASM edge builds (later rounds)
-- Softlist retrieval training (feature hook only)
+Deliberate exclusions — each exists in Laya's ecosystem but outside oio's
+remit (a local, hosted-free HTTP/MCP decision server). Evidence for every
+row is in [`RESEARCH-COMPARE.md`](RESEARCH-COMPARE.md) ("Laya's experimental
+layer vs oio scope").
+
+| Excluded | Why |
+|---|---|
+| Hooks framework + hook MCP tools | oio refuses them by name on the MCP surface; a fixed inference path keeps responses auditable |
+| `structured.decide` API, presets | preset sugar over the single `/v1/systemone` contract; callers compose the same behaviour themselves |
+| Eval harnesses (`laya-evals` regression gate, per-language research reports) | oio gates on parity fixtures plus its own evidence harness (latency bench + golden replay); accuracy evals stay in Laya's research tree |
+| Training / fine-tuning, RLCD, calibration fitting, recipes (es_phone_turns 0.396 → 0.912) | consume Laya's published artifacts at a pinned revision + digest instead of rebuilding its research stack |
+| Compile fast-path (TileLang kernels, torch.compile) | no torch in the stack; kernels arrive later via the `Runtime` trait only if they pay for themselves |
+| Integrations: langchain/langgraph, LlamaIndex, CrewAI, TypeScript SDK | Laya keeps them; oio is a base-URL drop-in behind any HTTP or MCP client |
+| GPU fast paths (CUDA/AMP, silent OOM→CPU fallback), WASM edge builds | CPU x86_64 Linux is the v1 baseline; GPU via ort CUDA EP is a later-round open decision (`PLAN.md`), not a promise |
+| ONNX export scripts, TensorRT capacity sweeps | checkpoints ship as ready-made ONNX; export belongs to Laya's toolchain and TRT rides on ONNX Runtime later |
+| Softlist retrieval training | the shortlist feature hook ships; training its retriever does not |
+
+Not excluded — scheduled instead: `batch_size`/`sort_by_length` batch
+controls (implemented, G3) and the evidence harness (latency bench + golden
+replay), per the gap ranking at the end of `RESEARCH-COMPARE.md`.
 
 ## 5. Users
 

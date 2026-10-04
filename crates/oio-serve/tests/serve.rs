@@ -82,6 +82,7 @@ impl Predictor for Stub {
         &self,
         states: &[Value],
         template: SystemOneRequest,
+        _opts: oio::engine::BatchOpts,
     ) -> oio::Result<Vec<SystemOneResponse>> {
         Ok(states
             .iter()
@@ -325,6 +326,95 @@ async fn health_open_without_auth_when_key_set() {
     let (st, body, _) = call(app(config), "GET", "/health", json!({})).await;
     assert_eq!(st, 200);
     assert_eq!(body["status"], "ok");
+    // without the bearer: liveness only, no checkpoint names or hardware
+    assert_eq!(
+        body.as_object().map(|o| o.len()),
+        Some(1),
+        "unauth health must not leak detail: {body}"
+    );
+}
+
+#[tokio::test]
+async fn health_detail_payload_matches_laya_shape() {
+    let (st, body, _) = call(app(ServeConfig::default()), "GET", "/health", json!({})).await;
+    assert_eq!(st, 200);
+    let keys: Vec<&str> = body
+        .as_object()
+        .expect("object")
+        .keys()
+        .map(|k| k.as_str())
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            "status",
+            "loaded",
+            "revisions",
+            "device",
+            "device_is_preference",
+            "checkpoint_devices",
+            "cpu_fallbacks"
+        ],
+        "field order follows laya's /health"
+    );
+    assert_eq!(body["status"], json!("ok"));
+    assert_eq!(body["loaded"], json!(["english"]));
+    // stubs report no artifact commit — the local-path value, like laya
+    assert_eq!(body["revisions"], json!({"english": null}));
+    assert_eq!(body["device"], json!("cpu"));
+    assert_eq!(body["device_is_preference"], json!(false));
+    assert_eq!(body["checkpoint_devices"], json!({"english": "cpu"}));
+    assert_eq!(
+        body["cpu_fallbacks"],
+        json!({"english": {"count": 0, "last_reason": null}})
+    );
+}
+
+#[tokio::test]
+async fn predict_responses_carry_laya_timing_headers() {
+    let (st, _, headers) = call(
+        app(ServeConfig::default()),
+        "POST",
+        "/v1/systemone",
+        json!({"state": "s", "questions": simple_q()}),
+    )
+    .await;
+    assert_eq!(st, 200);
+    let timing = headers
+        .get("server-timing")
+        .expect("Server-Timing header")
+        .to_str()
+        .unwrap();
+    let dur = timing
+        .strip_prefix("inference;dur=")
+        .unwrap_or_else(|| panic!("Server-Timing shape: {timing}"));
+    dur.parse::<f64>().expect("dur is a number");
+    headers
+        .get("x-inference-time-ms")
+        .expect("X-Inference-Time-Ms header")
+        .to_str()
+        .unwrap()
+        .parse::<f64>()
+        .expect("milliseconds are a number");
+}
+
+#[tokio::test]
+async fn batch_responses_carry_laya_timing_headers() {
+    let (st, _, headers) = call(
+        app(ServeConfig::default()),
+        "POST",
+        "/v1/systemone/batch",
+        json!({"states": ["a"], "questions": simple_q()}),
+    )
+    .await;
+    assert_eq!(st, 200);
+    assert!(
+        headers
+            .get("server-timing")
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|v| v.starts_with("inference;dur="))
+    );
+    assert!(headers.get("x-inference-time-ms").is_some());
 }
 
 #[tokio::test]
@@ -418,4 +508,74 @@ async fn low_confidence_flag() {
     assert!(body["answers"]["q"].get("low_confidence").is_none());
     assert_eq!(body["answers"]["q"]["abstention"], json!("passed"));
     assert_eq!(body["answers"]["q"]["abstention_threshold"], json!(0.5));
+}
+
+#[tokio::test]
+async fn batch_controls_validate_like_laya() {
+    let q = simple_q();
+    // Wrong type -> "must be an integer" (booleans, floats and strings are
+    // all non-integers to Python's isinstance check too).
+    for bad in [json!(true), json!(2.5), json!("3")] {
+        let (st, body, _) = call(
+            app(ServeConfig::default()),
+            "POST",
+            "/v1/systemone/batch",
+            json!({"states": ["a"], "questions": q, "batch_size": bad}),
+        )
+        .await;
+        assert_eq!(st, 422, "batch_size {bad}");
+        assert_eq!(body["detail"], json!("batch_size must be an integer"));
+    }
+    // Present but non-positive -> Laya's %r wording.
+    for (bad, want) in [
+        (json!(0), "batch_size must be a positive integer, got 0"),
+        (json!(-1), "batch_size must be a positive integer, got -1"),
+    ] {
+        let (st, body, _) = call(
+            app(ServeConfig::default()),
+            "POST",
+            "/v1/systemone/batch",
+            json!({"states": ["a"], "questions": q, "batch_size": bad}),
+        )
+        .await;
+        assert_eq!(st, 422, "batch_size {bad}");
+        assert_eq!(body["detail"], json!(want));
+    }
+    // sort_by_length must be a boolean.
+    for bad in [json!("yes"), json!(1), json!(0)] {
+        let (st, body, _) = call(
+            app(ServeConfig::default()),
+            "POST",
+            "/v1/systemone/batch",
+            json!({"states": ["a"], "questions": q, "sort_by_length": bad}),
+        )
+        .await;
+        assert_eq!(st, 422, "sort_by_length {bad}");
+        assert_eq!(body["detail"], json!("sort_by_length must be a boolean"));
+    }
+    // Valid values — and null, which means "not set" — all pass.
+    for (bs, sbl) in [
+        (json!(2), json!(true)),
+        (json!(1), json!(false)),
+        (json!(null), json!(null)),
+    ] {
+        let (st, _, _) = call(
+            app(ServeConfig::default()),
+            "POST",
+            "/v1/systemone/batch",
+            json!({"states": ["a", "b"], "questions": q, "batch_size": bs, "sort_by_length": sbl}),
+        )
+        .await;
+        assert_eq!(st, 200, "batch_size={bs} sort_by_length={sbl}");
+    }
+    // The single-shot endpoint has no batch controls (laya doesn't read them
+    // there either): an invalid value is simply not a batch-argument error.
+    let (st, _, _) = call(
+        app(ServeConfig::default()),
+        "POST",
+        "/v1/systemone",
+        json!({"state": "s", "questions": q, "batch_size": 0}),
+    )
+    .await;
+    assert_eq!(st, 200);
 }

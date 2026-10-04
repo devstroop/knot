@@ -42,8 +42,15 @@ pub trait Predictor: Send + Sync {
         &self,
         states: &[serde_json::Value],
         template: SystemOneRequest,
+        opts: oio::engine::BatchOpts,
     ) -> oio::Result<Vec<SystemOneResponse>>;
     fn loaded(&self) -> Vec<&'static str>;
+    /// Artifact commit a resident checkpoint was loaded from — the
+    /// `revisions` entry of `/health`. `None` (the default, what stubs
+    /// report) means "unknown / local path", Laya's value for one.
+    fn revision(&self, _name: &str) -> Option<String> {
+        None
+    }
     fn route(
         &self,
         state: &serde_json::Value,
@@ -64,12 +71,17 @@ impl Predictor for Engine {
         &self,
         states: &[serde_json::Value],
         template: SystemOneRequest,
+        opts: oio::engine::BatchOpts,
     ) -> oio::Result<Vec<SystemOneResponse>> {
-        Engine::predict_batch(self, states, template)
+        Engine::predict_batch(self, states, template, opts)
     }
 
     fn loaded(&self) -> Vec<&'static str> {
         self.resident()
+    }
+
+    fn revision(&self, name: &str) -> Option<String> {
+        Engine::revision(self, name)
     }
 
     fn route(
@@ -307,6 +319,49 @@ fn validate_min_confidence(body: &serde_json::Value) -> std::result::Result<Opti
     }
 }
 
+/// Laya's batch call controls (`serve.py` `_validate_batch_size_param` /
+/// `_validate_sort_by_length_param`): `batch_size` must be a positive
+/// integer, `sort_by_length` a boolean; both accept `null` as "not set",
+/// each failure a 422 carrying Laya's exact wording. `false` arrives as
+/// "the caller did not ask" — Laya only forwards `True` too.
+#[allow(clippy::result_large_err)]
+fn batch_opts(body: &serde_json::Value) -> std::result::Result<oio::engine::BatchOpts, Response> {
+    let batch_size = match body.get("batch_size") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(v) => match v.as_i64() {
+            Some(n) if n >= 1 => Some(n as usize),
+            Some(n) => {
+                return Err(json_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    format!("batch_size must be a positive integer, got {n}"),
+                ));
+            }
+            None => {
+                return Err(json_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "batch_size must be an integer",
+                ));
+            }
+        },
+    };
+    let sort_by_length = match body.get("sort_by_length") {
+        None | Some(serde_json::Value::Null) => false,
+        Some(v) => match v.as_bool() {
+            Some(b) => b,
+            None => {
+                return Err(json_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "sort_by_length must be a boolean",
+                ));
+            }
+        },
+    };
+    Ok(oio::engine::BatchOpts {
+        batch_size,
+        sort_by_length,
+    })
+}
+
 fn map_error(e: Error) -> Response {
     match e {
         Error::InvalidRequest(msg) => json_error(StatusCode::UNPROCESSABLE_ENTITY, msg),
@@ -406,9 +461,36 @@ async fn health(
 ) -> Response {
     let mut obj = serde_json::json!({"status": "ok"});
     if authorized(&headers, &state.config.api_key) {
-        obj["loaded"] = serde_json::json!(state.predictor.loaded());
-        obj["device"] = serde_json::json!("cpu");
-        obj["device_is_preference"] = serde_json::json!(false);
+        // Laya's detail payload, field for field (`serve.py` /health): the
+        // values are oio's own reality — always-CPU devices, zero CPU
+        // fallbacks (there is no other device to fall back from), and the
+        // artifact commit per resident checkpoint, or null for a local dir.
+        let names = state.predictor.loaded();
+        obj["loaded"] = serde_json::json!(&names);
+        let mut revisions = serde_json::Map::new();
+        let mut devices = serde_json::Map::new();
+        let mut fallbacks = serde_json::Map::new();
+        for name in &names {
+            revisions.insert(
+                (*name).to_string(),
+                state
+                    .predictor
+                    .revision(name)
+                    .map(serde_json::Value::String)
+                    .unwrap_or(serde_json::Value::Null),
+            );
+            devices.insert((*name).to_string(), serde_json::json!("cpu"));
+            fallbacks.insert(
+                (*name).to_string(),
+                serde_json::json!({"count": 0, "last_reason": serde_json::Value::Null}),
+            );
+        }
+        let resident_device = names.first().map(|_| "cpu");
+        obj["revisions"] = serde_json::Value::Object(revisions);
+        obj["device"] = serde_json::json!(resident_device.unwrap_or("cpu"));
+        obj["device_is_preference"] = serde_json::json!(resident_device.is_none());
+        obj["checkpoint_devices"] = serde_json::Value::Object(devices);
+        obj["cpu_fallbacks"] = serde_json::Value::Object(fallbacks);
     }
     Json(obj).into_response()
 }
@@ -540,6 +622,10 @@ async fn systemone(
                 apply_confidence_gate(&mut value, controls.min_confidence);
                 let mut resp = Json(value).into_response();
                 resp.headers_mut().insert(
+                    "server-timing",
+                    format!("inference;dur={infer_ms:.2}").parse().unwrap(),
+                );
+                resp.headers_mut().insert(
                     "x-inference-time-ms",
                     format!("{infer_ms:.2}").parse().unwrap(),
                 );
@@ -608,6 +694,7 @@ async fn systemone_batch(
         }
         check_refusals(&body)?;
         let controls = parse_controls(&body, state.config.max_token_budget)?;
+        let batch_opts = batch_opts(&body)?;
 
         let gate = state.gate.clone();
         let predictor = state.predictor.clone();
@@ -632,7 +719,7 @@ async fn systemone_batch(
                 min_confidence: None,
             };
             let inference = tokio::task::spawn_blocking(move || {
-                predictor.predict_batch(&states_clone, template)
+                predictor.predict_batch(&states_clone, template, batch_opts)
             })
             .await
             .map_err(|_| json_error(StatusCode::INTERNAL_SERVER_ERROR, "inference failed"))?;
@@ -654,6 +741,10 @@ async fn systemone_batch(
                     "total_usage": {"input_tokens": total, "output_tokens": 0},
                 }))
                 .into_response();
+                resp.headers_mut().insert(
+                    "server-timing",
+                    format!("inference;dur={infer_ms:.2}").parse().unwrap(),
+                );
                 resp.headers_mut().insert(
                     "x-inference-time-ms",
                     format!("{infer_ms:.2}").parse().unwrap(),
