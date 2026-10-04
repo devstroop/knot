@@ -26,7 +26,9 @@ Top-level milestone plan.
 ## Open decisions (next rounds)
 
 - GPU timing (CUDA vs CPU measurements) — the ort CUDA EP itself landed
-  behind `OIO_DEVICE=cuda` (SPEC §10); the numbers still owe a GPU runner run
+  behind `OIO_DEVICE=cuda` (SPEC §10); the numbers come from
+  `.github/workflows/gpu.yml` (dispatch-only; needs the `GPU_RUNNER`
+  repository variable pointing at a GPU runner label)
 
 Resolved: fixture format + export script → ADR-005; one binary vs two →
 ADR-004; model cache layout → SPEC §9 (resolution order, `SHA256SUMS`);

@@ -1,0 +1,168 @@
+name: GPU
+
+# CPU-vs-CUDA runs on a GPU runner: the workspace test suites with the
+# `cuda` feature (includes the CUDA parity suite), a serve smoke check
+# that /health reports the real device, and the device latency bench
+# (PLAN open decision: GPU timing).
+#
+# One-time GPU runner setup (larger runners are billed per minute, even
+# on public repositories — this workflow is dispatch-only so nothing
+# runs until someone asks for it):
+#
+#   1. GitHub Team (organization) or Enterprise Cloud plan + a payment
+#      method on the account.
+#   2. Organization settings → Runners → New organization runner →
+#      Ubuntu, image "GPU-optimized" (partner image), size under the
+#      "GPU-powered" tab (e.g. NVIDIA T4, 16 GB). Larger runners get a
+#      default label equal to their name — name the runner `gpu-t4`.
+#   3. Grant the `devstroop/oio` repository access to that runner
+#      (runner group → repositories).
+#   4. Repository → Settings → Secrets and variables → Actions →
+#      Variables → add `GPU_RUNNER` = the runner label (`gpu-t4`).
+#
+# The label is read from `vars.GPU_RUNNER` instead of hardcoded so any
+# GPU runner works — a GitHub-hosted GPU larger runner, or a hosted
+# provider's runner registered through its GitHub app (e.g. machine.dev
+# T4 from ~$0.003/min spot). With the variable unset, only the free
+# preflight job runs and it fails with the message above.
+#
+# First run notes: ort's `cuda` feature downloads ONNX Runtime's CUDA 13
+# binaries (Turing sm_75+, driver r580+, cuDNN 9). If the runner image
+# ships an older CUDA toolkit/driver, the build or the first CUDA test
+# fails with a linker/runtime message — the "GPU and toolchain versions"
+# step prints what the image actually has.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Same pins as scripts/demo.sh: the reviewed Laya checkpoint revision
+  # and the laya checkout that scripts/export_onnx.py comes from.
+  HF_REVISION: 55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851
+  LAYA_REF: 4aa6761be8173de4ce6d92c31b3e40b6eaf59a7c
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GPU runner label configured
+        env:
+          GPU_RUNNER: ${{ vars.GPU_RUNNER }}
+        run: |
+          if [ -z "$GPU_RUNNER" ]; then
+            echo "::error::Set the repository variable GPU_RUNNER to your GPU runner label — setup instructions live in the header of .github/workflows/gpu.yml (GitHub Team/Enterprise GPU larger runner, or a hosted provider's label)."
+            exit 1
+          fi
+          echo "GPU runner label: $GPU_RUNNER"
+
+  gpu:
+    needs: preflight
+    runs-on: ${{ vars.GPU_RUNNER }}
+    timeout-minutes: 90
+    env:
+      OIO_MODEL_DIR: ${{ github.workspace }}/.ckpt/laya-english
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: GPU and toolchain versions
+        run: |
+          nvidia-smi
+          nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv,noheader
+          /usr/local/cuda/bin/nvcc --version || nvcc --version || echo "no nvcc (CUDA user-mode libs may still be installed)"
+
+      - uses: actions/checkout@v7
+        with:
+          repository: devstroop/laya
+          ref: ${{ env.LAYA_REF }}
+          path: laya
+
+      - name: Python export toolchain (venv + torch CPU + laya[onnx])
+        run: |
+          python3 -m venv .venv-gpu 2>/dev/null || {
+            sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv python3-pip
+            python3 -m venv .venv-gpu
+          }
+          echo "$PWD/.venv-gpu/bin" >> "$GITHUB_PATH"
+          .venv-gpu/bin/python -m pip install --upgrade pip
+          .venv-gpu/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+          .venv-gpu/bin/pip install "./laya[onnx]"
+
+      - name: Checkpoint cache (torch weights + exported ONNX)
+        uses: actions/cache@v4
+        with:
+          path: .ckpt
+          key: laya-english-${{ env.HF_REVISION }}-onnx-v1
+
+      - name: Fetch checkpoint (torch weights, pinned revision)
+        run: |
+          python3 - <<'PY'
+          import os
+          from huggingface_hub import snapshot_download
+          snap = snapshot_download(
+              "convaiinnovations/laya",
+              revision=os.environ["HF_REVISION"],
+              allow_patterns=[
+                  "*.json", "*.py", "model.safetensors",
+                  "tokenizer/*", "encoder/*",
+              ],
+              local_dir=os.environ["OIO_MODEL_DIR"],
+          )
+          print("checkpoint:", snap)
+          PY
+
+      - name: Export ONNX (the hub ships torch only)
+        run: |
+          if [ ! -f "$OIO_MODEL_DIR/laya.onnx" ]; then
+            HF_HUB_OFFLINE=1 python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, os.path.join(os.environ["GITHUB_WORKSPACE"], "laya"))
+          from scripts.export_onnx import export_to_onnx
+          d = os.environ["OIO_MODEL_DIR"]
+          export_to_onnx(d, os.path.join(d, "laya.onnx"))
+          PY
+          fi
+          ls -la "$OIO_MODEL_DIR"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: gpu-cuda
+
+      - name: "cargo test (cuda feature: CPU + CUDA parity, engine, serve)"
+        run: cargo test --workspace --features cuda
+
+      - name: serve reports the real device on /health
+        run: |
+          cargo build -p oio-serve --features cuda
+          OIO_DEVICE=cuda OIO_PORT=8080 target/debug/oio-serve &
+          pid=$!
+          for _ in $(seq 1 60); do
+            curl -sf localhost:8080/health >/dev/null && break
+            sleep 1
+          done
+          curl -s localhost:8080/health | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)
+          assert d["device"] == "cuda", d
+          assert d["device_is_preference"] is False, d
+          assert d["checkpoint_devices"] == {"english": "cuda"}, d
+          assert d["cpu_fallbacks"] == {"english": {"count": 0, "last_reason": None}}, d
+          print("health device ok:", d["device"], d["checkpoint_devices"])
+          '
+          kill "$pid"
+
+      - name: device latency bench (release, CUDA then CPU)
+        env:
+          OIO_DEVICE: cuda
+        run: |
+          {
+            echo "### device latency (p50/p95/mean per predict)"
+            echo '```'
+            cargo test --release --features cuda --test gpu_bench -- --ignored --nocapture 2>&1 | grep '^device='
+            OIO_DEVICE=cpu cargo test --release --features cuda --test gpu_bench -- --ignored --nocapture 2>&1 | grep '^device='
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
