@@ -94,7 +94,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .ckpt
-          key: laya-english-${{ env.HF_REVISION }}-onnx-v1
+          key: laya-english-${{ env.HF_REVISION }}-onnx-v1-${{ runner.os }}
 
       - name: Fetch checkpoint (torch weights, pinned revision)
         run: |
