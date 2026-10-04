@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # Parity suites (engine/longdoc/onnx_parity/candle_parity) skip
+      # themselves without OIO_MODEL_DIR, so this is green without a
+      # checkpoint; set OIO_MODEL_DIR (a converted Laya export) to run them.
+      - name: cargo test
+        run: cargo test --workspace

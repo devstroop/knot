@@ -19,6 +19,9 @@ cargo test --workspace
 cargo check -p oio            # fast path: no ort/tokenizers/axum
 ```
 
+CI (`.github/workflows/ci.yml`) runs the first three on every push to `main`
+and on pull requests.
+
 The end-to-end parity suites (engine/longdoc/onnx_parity/candle_parity) skip
 themselves when no checkpoint is available, so "green" is only meaningful with
 one set:
