@@ -82,6 +82,7 @@ impl Predictor for Stub {
         &self,
         states: &[Value],
         template: SystemOneRequest,
+        _opts: oio::engine::BatchOpts,
     ) -> oio::Result<Vec<SystemOneResponse>> {
         Ok(states
             .iter()
@@ -507,4 +508,74 @@ async fn low_confidence_flag() {
     assert!(body["answers"]["q"].get("low_confidence").is_none());
     assert_eq!(body["answers"]["q"]["abstention"], json!("passed"));
     assert_eq!(body["answers"]["q"]["abstention_threshold"], json!(0.5));
+}
+
+#[tokio::test]
+async fn batch_controls_validate_like_laya() {
+    let q = simple_q();
+    // Wrong type -> "must be an integer" (booleans, floats and strings are
+    // all non-integers to Python's isinstance check too).
+    for bad in [json!(true), json!(2.5), json!("3")] {
+        let (st, body, _) = call(
+            app(ServeConfig::default()),
+            "POST",
+            "/v1/systemone/batch",
+            json!({"states": ["a"], "questions": q, "batch_size": bad}),
+        )
+        .await;
+        assert_eq!(st, 422, "batch_size {bad}");
+        assert_eq!(body["detail"], json!("batch_size must be an integer"));
+    }
+    // Present but non-positive -> Laya's %r wording.
+    for (bad, want) in [
+        (json!(0), "batch_size must be a positive integer, got 0"),
+        (json!(-1), "batch_size must be a positive integer, got -1"),
+    ] {
+        let (st, body, _) = call(
+            app(ServeConfig::default()),
+            "POST",
+            "/v1/systemone/batch",
+            json!({"states": ["a"], "questions": q, "batch_size": bad}),
+        )
+        .await;
+        assert_eq!(st, 422, "batch_size {bad}");
+        assert_eq!(body["detail"], json!(want));
+    }
+    // sort_by_length must be a boolean.
+    for bad in [json!("yes"), json!(1), json!(0)] {
+        let (st, body, _) = call(
+            app(ServeConfig::default()),
+            "POST",
+            "/v1/systemone/batch",
+            json!({"states": ["a"], "questions": q, "sort_by_length": bad}),
+        )
+        .await;
+        assert_eq!(st, 422, "sort_by_length {bad}");
+        assert_eq!(body["detail"], json!("sort_by_length must be a boolean"));
+    }
+    // Valid values — and null, which means "not set" — all pass.
+    for (bs, sbl) in [
+        (json!(2), json!(true)),
+        (json!(1), json!(false)),
+        (json!(null), json!(null)),
+    ] {
+        let (st, _, _) = call(
+            app(ServeConfig::default()),
+            "POST",
+            "/v1/systemone/batch",
+            json!({"states": ["a", "b"], "questions": q, "batch_size": bs, "sort_by_length": sbl}),
+        )
+        .await;
+        assert_eq!(st, 200, "batch_size={bs} sort_by_length={sbl}");
+    }
+    // The single-shot endpoint has no batch controls (laya doesn't read them
+    // there either): an invalid value is simply not a batch-argument error.
+    let (st, _, _) = call(
+        app(ServeConfig::default()),
+        "POST",
+        "/v1/systemone",
+        json!({"state": "s", "questions": q, "batch_size": 0}),
+    )
+    .await;
+    assert_eq!(st, 200);
 }

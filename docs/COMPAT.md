@@ -115,6 +115,16 @@ quality/latency numbers: `docs/RESEARCH-COMPARE.md`.
   can ever occur).
 - Predict responses carry both timing headers Laya sends: `Server-Timing:
   inference;dur=<ms>` and `X-Inference-Time-Ms: <ms>`.
+- `/v1/systemone/batch` accepts Laya's batch call controls with Laya's
+  validation: `batch_size` a positive integer (`"batch_size must be an
+  integer"` / `"batch_size must be a positive integer, got N"`), 
+  `sort_by_length` a boolean (`"sort_by_length must be a boolean"`), both
+  `null`-tolerated — all three wrong-type/range cases are 422. The engine
+  honours them the way `agent.py` does: chunking by `batch_size` (default
+  the whole group), a stable ascending length sort inside a `chunk*8` window
+  only when `1 < batch_size < n`, results written back to input positions.
+  The MCP batch tool validates the same arguments with Laya's merged MCP
+  wording (`"batch_size must be a positive integer, got {v!r}"`).
 - `GET /models` is **oio's extension** — laya-serve has no such route
   (`docs/http-api.md` lists only `/health`, `/v1/systemone`,
   `/v1/systemone/batch`). Clients written against Jev/Laya never call it;

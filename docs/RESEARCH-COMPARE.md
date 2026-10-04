@@ -54,13 +54,15 @@ Confirmed identical at `develop` (`3628821`), serve.py ↔ `oio-serve`:
 
 Remaining deltas (ranked at the end of this file). Fixed since `3628821`:
 G1 health detail payload, G2 `Server-Timing` header (`X-Inference-Time-Ms`
-already existed), G5 `/models` documented as an oio extension.
+already existed), G3 batch call controls (validated with Laya's wording;
+`batch_size`/`sort_by_length` drive real chunking/sorting), G5 `/models`
+documented as an oio extension.
 
 | | Delta | Laya | oio at `3628821` | Status |
 |---|---|---|---|---|
 | G1 | `/health` detail payload | `revisions`, `checkpoint_devices`, `cpu_fallbacks` alongside `loaded`/`device` (`serve.py:755-796`, `docs/http-api.md`) | only `loaded`, `device` (hardcoded `"cpu"`), `device_is_preference` (`lib.rs`); unauth → `{"status":"ok"}` matches | fixed: full payload; `revisions` from the HF snapshot etag (the reviewed `55cf4c4e…` for `convaiinnovations/laya`), `null` for plain local dirs (Laya's own local-path value) |
 | G2 | Latency headers | `Server-Timing: inference;dur=…`, `X-Inference-Time-Ms` (`serve.py:884-885, 1009-1010`) | `X-Inference-Time-Ms` only | fixed: both headers on predict + batch |
-| G3 | Batch call controls `batch_size`, `sort_by_length` | validated, wrong type/range → **422** (`serve.py:112, 266-291`) | parsed and silently ignored | open (Step 3: validation + engine effect) |
+| G3 | Batch call controls `batch_size`, `sort_by_length` | validated, wrong type/range → **422** (`serve.py:112, 266-291`) | parsed and silently ignored | fixed: HTTP validators carry Laya's exact messages (MCP uses laya's merged wording), the engine chunks/sorts per `agent.py` (`window = chunk*8` only when `1 < batch_size < n`), answers proven unchanged by a checkpoint-gated replay |
 | G4 | `lang_temperatures` | per-language temperature maps (`common.py:728`) | only the 3 per-type + per-bucket calibration (`runtime.rs:56-69`) | open |
 | G5 | `GET /models` | not part of laya-serve | present (`lib.rs:416-424`) — an oio extension, documented as such | fixed: documented in COMPAT |
 
@@ -110,7 +112,7 @@ below is where that gets closed.
 | Finetuning + recipes (es_phone_turns 0.396 → 0.912) | yes | no |
 | Compile fast-path | yes | no |
 | Integrations: langchain/langgraph, LlamaIndex, CrewAI, TypeScript SDK | yes | no |
-| GPU: CUDA/AMP, silent OOM→CPU fallback, length-sorted batching (measured 2.15× on 10k tickets, `research/README.md:66-71`) | yes | CPU only (ort + candle); length sorting not implemented |
+| GPU: CUDA/AMP, silent OOM→CPU fallback, length-sorted batching (measured 2.15× on 10k tickets, `research/README.md:66-71`) | yes | CPU only (ort + candle); length sorting implemented (`batch_size`/`sort_by_length`, planning-only — no answer changes) |
 | ONNX export scripts, TensorRT capacity sweeps | export scripts, TRT via ONNX Runtime | ort CPU, no export script |
 | Research benches: feishu_zh, zh_short_commands, position sensitivity, latency, NVIDIA capacity | yes | latency bench pending (evidence harness) |
 
@@ -120,9 +122,9 @@ hosted-free HTTP/MCP decision server); `PRD.md` now states that explicitly.
 ## Gap ranking
 
 1. **Serve wire parity** — G1 health payload, G2 timing headers, G3 batch
-   controls (validate now, effect with #2), G5 document `/models`.
+   controls (validated + honoured), G5 document `/models`.
 2. **`sort_by_length`** — laya's measured 2.15× with zero decision changes;
-   G3's valid flag becomes real here.
+   implemented as G3's engine effect (chunked, stable length sort).
 3. **Scope declarations** — PRD/PLAN record the "no" column above.
 4. **Evidence harness** — latency numbers and an end-to-end golden replay so
    oio measures itself, not just its fixtures.

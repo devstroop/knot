@@ -73,6 +73,9 @@ fn tools() -> Vec<(&'static str, &'static str, serde_json::Value)> {
                     "task": { "type": "string" },
                     "lang": { "type": "string" },
                     "lang_guess": { "type": "string" },
+                    "min_confidence": { "type": "number" },
+                    "batch_size": { "type": "integer" },
+                    "sort_by_length": { "type": "boolean" },
                 },
                 "required": ["states", "questions"],
                 "additionalProperties": false,
@@ -97,6 +100,43 @@ fn tool_error(msg: impl Into<String>) -> serde_json::Value {
     serde_json::json!({
         "content": [{"type": "text", "text": msg.into()}],
         "isError": true,
+    })
+}
+
+/// Python `repr` for the scalar in laya's MCP error wording
+/// (`f"batch_size must be a positive integer, got {v!r}"`).
+fn py_repr(v: &serde_json::Value) -> String {
+    match v {
+        serde_json::Value::Bool(b) => String::from(if *b { "True" } else { "False" }),
+        serde_json::Value::String(s) => format!("'{s}'"),
+        other => other.to_string(),
+    }
+}
+
+/// Batch call controls for the MCP surface, validated the way laya's
+/// `_validate_batch_size` does — one merged message for every wrong shape,
+/// Python `repr` of the offending value.
+fn batch_opts_of(args: &serde_json::Value) -> Result<oio::engine::BatchOpts, String> {
+    let batch_size = match args.get("batch_size") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(v) => match v.as_i64() {
+            Some(n) if n >= 1 => Some(n as usize),
+            _ => {
+                return Err(format!(
+                    "batch_size must be a positive integer, got {}",
+                    py_repr(v)
+                ));
+            }
+        },
+    };
+    let sort_by_length = match args.get("sort_by_length") {
+        None | Some(serde_json::Value::Null) => false,
+        Some(serde_json::Value::Bool(b)) => *b,
+        Some(_) => return Err("sort_by_length must be a boolean".into()),
+    };
+    Ok(oio::engine::BatchOpts {
+        batch_size,
+        sort_by_length,
     })
 }
 
@@ -237,11 +277,15 @@ fn call_tool(
                 Ok(m) => m,
                 Err(e) => return tool_error(e),
             };
+            let opts = match batch_opts_of(args) {
+                Ok(o) => o,
+                Err(e) => return tool_error(e),
+            };
             let template: SystemOneRequest = match serde_json::from_value(request_like) {
                 Ok(t) => t,
                 Err(e) => return tool_error(format!("invalid request: {e}")),
             };
-            match predictor.predict_batch(&states, template) {
+            match predictor.predict_batch(&states, template, opts) {
                 Ok(results) => {
                     let total: usize = results.iter().map(|r| r.usage.input_tokens).sum();
                     let mut value = serde_json::json!({
