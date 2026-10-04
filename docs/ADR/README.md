@@ -8,3 +8,5 @@ supersede it with a new one (`Supersedes: 00x`).
 | [001](001-ort-first.md) | ort-first runtime, ONNX artifacts reused from Laya | accepted |
 | [002](002-naming-and-branding.md) | OIO_* naming, Apache-2.0, own cache dir | accepted |
 | [003](003-workspace-layout.md) | cargo workspace of oio + oio-serve | accepted |
+| [004](004-single-binary.md) | one `oio-serve` binary, MCP behind `--mcp` | accepted |
+| [005](005-artifacts-and-fixtures.md) | checkpoint artifact layout, parity-fixture format | accepted |
