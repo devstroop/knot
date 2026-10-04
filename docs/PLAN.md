@@ -18,6 +18,9 @@ Top-level milestone plan.
 
 - One milestone per PR; CI gates: `cargo fmt --check`, `cargo clippy`, `cargo test`.
 - Milestones keep the doc tables above in sync.
+- Out-of-scope features are declared once, in `PRD.md` §4 with one-line
+  rationales (evidence: `RESEARCH-COMPARE.md`); a milestone must not widen
+  scope without editing that table first.
 - Issues/bugs are not tracked here — only milestone exit criteria.
 
 ## Open decisions (next rounds)
