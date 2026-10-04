@@ -46,9 +46,11 @@ fn scaled_softmax_and_confidence() {
     assert!(answer_confidence(&p) >= p[0] - 1e-6);
 }
 
+/// Run the fixture forward on `device` and assert every unmasked marker
+/// logit against the torch reference. Missing checkpoint → skip (gate
+/// rules); a device that cannot load the model → hard failure (SPEC §10).
 #[cfg(feature = "onnx")]
-#[test]
-fn onnx_forward_matches_torch_fixture() {
+fn assert_forward_matches_fixture(device: oio::runtime::Device) {
     let Some(dir) = model_dir() else {
         eprintln!("skip: OIO_MODEL_DIR not set or export missing");
         return;
@@ -88,7 +90,7 @@ fn onnx_forward_matches_torch_fixture() {
         })
         .collect();
 
-    let rt = OnnxRuntime::load(&dir, oio::runtime::Device::Cpu).unwrap();
+    let rt = OnnxRuntime::load(&dir, device).unwrap();
     let (logits, _act) = rt
         .forward(
             &flat("input_ids"),
@@ -129,4 +131,18 @@ fn onnx_forward_matches_torch_fixture() {
             }
         }
     }
+}
+
+#[cfg(feature = "onnx")]
+#[test]
+fn onnx_forward_matches_torch_fixture() {
+    assert_forward_matches_fixture(oio::runtime::Device::Cpu);
+}
+
+/// Same contract on the GPU (SPEC §10): exists only in `cuda` builds and,
+/// unlike the CPU suite, a CUDA that cannot load is a failure, not a skip.
+#[cfg(feature = "cuda")]
+#[test]
+fn cuda_forward_matches_torch_fixture() {
+    assert_forward_matches_fixture(oio::runtime::Device::Cuda);
 }
