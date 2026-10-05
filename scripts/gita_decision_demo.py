@@ -15,7 +15,11 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
+# Python's \w excludes combining marks, so Devanagari words would otherwise be
+# split at every vowel sign and virama. Keep word characters plus the combining
+# marks used by Devanagari and transliteration.
+COMBINING_MARKS = "\u0300-\u036f\u0900-\u0903\u093a-\u094f\u0951-\u0957\u0962-\u0963"
+TOKEN_RE = re.compile(r"(?:[^\W_]|[%s])+" % COMBINING_MARKS, re.UNICODE)
 STOP_WORDS = {
     "a", "about", "after", "all", "also", "am", "an", "and", "any", "are", "as",
     "at", "be", "because", "been", "before", "being", "between", "both", "but",
@@ -26,6 +30,15 @@ STOP_WORDS = {
     "there", "these", "they", "this", "those", "to", "was", "we", "were", "what",
     "text", "when", "where", "which", "who", "why", "will", "with", "would",
     "you", "your",
+    # Hindi function words, auxiliaries, and question particles.
+    "के", "की", "को", "का", "में", "से", "पर", "और", "है", "हैं", "हो",
+    "यह", "वह", "तो", "भी", "ही", "कि", "जो", "था", "थी", "थे", "द्वारा",
+    "अपने", "अपनी", "अपना", "उसके", "उसकी", "इसके", "इसकी", "वाले", "वाली",
+    "वाला", "सब", "सभी", "नहीं", "न", "हे", "क्या", "कैसे", "कौन", "कौनसा",
+    "कौनसी", "कौनसे", "कब", "कहाँ", "कितना", "कितनी", "कितने", "मैं", "मेरा",
+    "मेरी", "मेरे", "तुम", "तुम्हारा", "तुम्हारी", "तुम्हारे", "हम", "हमारे",
+    "उसे", "उनके", "उन्हें", "इसे", "किसे", "किसके", "वे", "उन", "सबसे",
+    "सा", "सी", "लिए", "सकता", "सकती", "सकते", "सकत",
 }
 DEFAULT_GITA_REPO = Path(__file__).resolve().parents[2] / "gita"
 
@@ -73,7 +86,7 @@ def tokenize(value):
         for token in TOKEN_RE.findall(clean_text(value).casefold())
         if token not in STOP_WORDS
         for normalized in (normalize_token(token),)
-        if normalized
+        if normalized and any(character.isalnum() for character in normalized)
     )
 
 
@@ -85,7 +98,10 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
-def load_passages(gita_repo, author):
+def load_passages(gita_repo, author, language="english"):
+    language = language.casefold()
+    if language not in {"english", "hindi"}:
+        raise ValueError("language must be english or hindi")
     data_dir = Path(gita_repo) / "data"
     verses_path = data_dir / "verse.json"
     translations_path = data_dir / "translation.json"
@@ -110,7 +126,7 @@ def load_passages(gita_repo, author):
     authors = set()
     seen_verses = set()
     for translation in translations:
-        if not isinstance(translation, dict) or translation.get("lang", "").casefold() != "english":
+        if not isinstance(translation, dict) or translation.get("lang", "").casefold() != language:
             continue
         translation_author = clean_text(translation.get("authorName"))
         if not translation_author:
@@ -138,11 +154,13 @@ def load_passages(gita_repo, author):
         ))
     if author and not any(name.casefold() == author.casefold() for name in authors):
         raise ValueError(
-            "English translation author %r not found; available: %s"
-            % (author, ", ".join(sorted(authors)))
+            "%s translation author %r not found; available: %s"
+            % (language.capitalize(), author, ", ".join(sorted(authors)))
         )
     if not passages:
-        raise ValueError("no indexed English translations found in %s" % data_dir)
+        raise ValueError(
+            "no indexed %s translations found in %s" % (language, data_dir)
+        )
     return passages
 
 
