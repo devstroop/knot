@@ -24,6 +24,9 @@ operability, latency, strictness, and deployability.
 - Platforms: x86_64 Linux and macOS on Apple Silicon (arm64). Intel Macs
   have no ONNX Runtime prebuilts, and the `cuda` feature /
   `OIO_DEVICE=cuda` are x86_64-Linux-only (SPEC §10).
+- Linux builds need a C/C++ toolchain, `pkg-config`, and OpenSSL headers for
+  the build-time ONNX Runtime download (`build-essential pkg-config libssl-dev`
+  on Ubuntu/Debian).
 - A converted Laya checkpoint to **serve** or to run the parity suites; the
   library and the fast test suites build without one.
 
@@ -33,7 +36,7 @@ operability, latency, strictness, and deployability.
 cargo check -p oio            # core (no model runtime)
 cargo check -p oio-serve      # pulls ONNX Runtime + tokenizers
 cargo check -p oio-serve --features cuda   # + ort CUDA EP (Turing sm_75+,
-                                           #   driver r580+, CUDA 13, cuDNN 9)
+                                           #   CUDA 12 runtime, cuDNN 9)
 ```
 
 ## Run
