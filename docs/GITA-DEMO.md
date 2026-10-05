@@ -1,0 +1,117 @@
+# Gita retrieval + OIO decision demo
+
+This optional local demo uses the authorized clone at
+[itsalfredashu/gita](https://github.com/itsalfredashu/gita) as a small,
+attributed knowledge source. It demonstrates retrieval followed by an OIO
+typed decision; it does **not** train a model or make the full corpus part of
+OIO's runtime artifacts.
+
+The first version indexes the English translation by Swami Sivananda and uses
+simple lexical BM25 retrieval. OIO then makes one of three decisions over the
+retrieved evidence:
+
+- `choice`: select the most relevant cited verse;
+- `score`: rate how directly the passages support an answer;
+- `noul`: decide whether the passages provide enough evidence without
+  unsupported additions.
+
+The demo prints the answer with chapter/verse citation, translation author,
+retrieval score, source repository revision, and hashes for the source data.
+It sends only the query and retrieved excerpts to OIO. It does not retrieve or
+send the full commentary archive.
+
+When BM25 finds no positive-scoring passage, the demo returns
+`"no_evidence": true` with `"decision": null` and does not call OIO. This
+prevents a zero-score tie from being presented as a meaningful candidate
+choice. In `choice` mode, fewer than two positive candidates also produces no
+decision and does not call OIO (`"insufficient_candidates": true`); `score` and
+`noul` can evaluate a single retrieved passage.
+
+## Run
+
+1. Start OIO with a locally available checkpoint:
+
+   ```bash
+   OIO_MODEL_DIR=/path/to/laya-english cargo run -p oio-serve
+   ```
+
+2. From the OIO repository root, ask a question:
+
+   ```bash
+   python3 scripts/gita_decision_demo.py \
+     "How should someone act without becoming attached to the result?" \
+     --gita-repo ../gita
+   ```
+
+   Select another primitive or number of retrieved candidates with
+   `--mode score|noul` and `--top-k 3`. Change the retrieval author with
+   `--author "Swami Adidevananda"`; available English translation authors are
+   validated against the local corpus. The default server URL is
+   `http://127.0.0.1:8000`; override it with `--oio-url`.
+
+The retriever and request-shape tests use Python's standard library:
+
+```bash
+cd scripts
+python3 -m unittest -v test_gita_decision_demo.py
+```
+
+## Retrieval evaluation
+
+Run the small, hand-authored retrieval set without calling OIO:
+
+```bash
+python3 scripts/evaluate_gita_retrieval.py \
+  --gita-repo ../gita \
+  --author "Swami Sivananda" \
+  --top-k 5
+```
+
+The set in `scripts/gita_retrieval_eval.jsonl` has four answerable questions
+with reviewed relevant citations and two intentionally out-of-domain
+questions. Its JSON report includes answerable citation Recall@k, answerable
+case Recall@k, MRR@k, and the rate at which unanswerable queries produce no
+positive lexical match. It reports retrieval only; these numbers do not measure
+OIO's decision quality. Review and expand the questions and citations before
+using the results as a quality claim. In particular, a nonzero lexical hit for
+an unanswerable question is a retrieval false positive, not evidence that the
+corpus answers it.
+
+BM25 remains the baseline. Compare future lexical, hybrid, or semantic
+retrievers against this same reviewed set, with retrieval Recall@k measured
+before evaluating OIO decisions. This first prototype does not include a
+semantic model or claim that lexical scores represent calibrated relevance.
+
+On the initial six-case set for Swami Sivananda's English translation, BM25
+at `k=5` achieved answerable-citation Recall@5 **1.00**, answerable-case
+Recall@5 **1.00**, MRR@5 **0.875**, and unanswerable no-evidence rate **0.50**
+(one of two out-of-domain queries still matched generic words). These are
+descriptive smoke metrics on a tiny hand-authored set, not a general quality
+estimate.
+
+## Scope and limitations
+
+This is a prototype for measuring the value of a domain corpus with OIO, not a
+claim that the model has learned the Gita. BM25 is lexical, not semantic, and
+the existing decision checkpoint may choose or score passages poorly. Inspect
+retrieved passages and citations alongside each answer. For a quality
+evaluation, create a separately reviewed question set, include unanswerable
+questions, and report retrieval recall separately from OIO decision quality.
+
+The current demo uses English translation text only. The source clone is
+treated as authorized for this prototype as requested; author attribution and
+source hashes are retained so provenance remains visible. Verify any
+per-translation or commentary rights before redistributing corpus text or
+using it in a released training artifact. The demo output is not religious
+guidance and does not replace interpreting the source in context.
+
+## Initial local smoke observation
+
+With the existing English checkpoint (`55cf4c4...`), the query
+"How should someone act without attachment to results?" retrieved BG 3.25 and
+BG 2.47 as its two highest BM25 passages. OIO selected BG 18.23 from the
+five-candidate list, with answer confidence about 0.22. The confidence is low
+and its choice did not match the lexical rank-1 passage. This is useful evidence
+that the integration works, but also that the current general checkpoint is
+not a qualified Gita reranker. Do not interpret the smoke output as accuracy
+or tune thresholds from this single example.
