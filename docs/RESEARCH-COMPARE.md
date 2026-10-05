@@ -99,8 +99,59 @@ calibration and latency; Jev wins the Chinese workplace diagnostic decisively
 and is competitive on Banking77. Both ship over-confident (Laya refits to ECE
 0.081; Jev's published ECE is 0.246 with a 13% option-order flip rate — the
 research README's own framing). oio inherits Laya's quality profile from the
-same weights; its own numbers start with the harness below — the parity
+same weights; its own numbers are in the two sections below — the parity
 suites still only prove behaviour against fixtures.
+
+## Jev-headline datasets re-run through oio
+
+The run behind the headline's AG News and DAIR Emotion cells
+(`laya/research/results/app_benchmark_results.json`, laya 0.2.1, CPU, 400
+cases, seed 13) replays through `oio-serve`: same datasets and prompts
+(`laya/research/scripts/bench_apps.py`), first 400 test rows, English
+checkpoint loaded directly (no router), pinned revision `55cf4c4e…`
+(weights sha256 `891102d3…`), Apple M2 (8 GB, CPU, `OIO_RUNTIME=candle`):
+
+| metric | oio 400 | Laya English 400 | Jev published (n=100) |
+|---|---|---|---|
+| AG News accuracy | 0.950 | 0.950 | 0.910 |
+| AG News ECE ↓ | **0.031** | 0.032 | 0.064 |
+| AG News Brier ↓ | **0.081** | 0.081 | 0.146 |
+| AG News NLL ↓ | **0.163** | 0.164 | 0.495 |
+| AG News coverage at ≤5% error | **0.995** | — | 0.830 |
+| DAIR Emotion accuracy | 0.593 | 0.595 | 0.480 |
+| DAIR Emotion Brier ↓ | **0.697** | 0.696 | 0.846 |
+| DAIR Emotion ECE ↓ | **0.310** | 0.306 | 0.351 |
+| DAIR Emotion NLL ↓ | 2.328 | 2.019 | 5.588 |
+| DAIR Emotion zero-prob on true label | 1.75% | — | 16% |
+| DAIR Emotion coverage at ≤5% error | **0.028** | — | 0.000 |
+
+- oio reproduces Laya to the digit: AG News identical (0.950 accuracy,
+  0.9439 macro-F1), emotion within one case (0.5925 vs 0.595) plus batching
+  float noise; calibration agrees to 0.001–0.003 ECE.
+- Jev cells are AbdelStark's hosted `jev-1.13.0` pilot (class-balanced
+  n=100 per dataset, 2026-09-17). Samples and hardware differ; the columns
+  are directional, not a controlled head-to-head.
+- Emotion NLL: oio serves 4-decimal probabilities, so the 7 cases whose true
+  value is below 5e-5 ship as `0.0` and cost 0.31 NLL; corrected in-process
+  NLL is 2.018 against Laya's 2.019. Jev's 16% zero-prob is model output,
+  not rounding.
+- Pure criterion-order flips (identity + 8 fixed permutations, first 100
+  cases): AG News **0.63%**, emotion **2.75%** (Laya's own `en.emotion` is
+  4.0%). `nibzard`'s 13% Jev figure pools repeat variation with
+  permutations — an upper bound, not the same measurement.
+- Latency on this laptop CPU: 1.02 s p50 (AG News) / 0.78 s (emotion) per
+  HTTP call, against Jev's hosted 236–256 ms — the offline baseline trades
+  hosted latency for zero marginal cost and no network. (candle on macOS
+  links Accelerate: ~2.5× the generic gemm here — 1.8 s → 0.7 s single-call.)
+- An independent study (`arXiv:2609.24965`) records Jev at a 0.335 s median
+  with 20/20 semantic Choices correct (50/50 across five repeats) on a
+  scientific-decision harness — the same primitive contract, a different
+  task.
+- Replay note: with the router in play, a few English AG News rows
+  containing non-Latin script route to `multilingual`; with only `english`
+  configured that request 500s (`checkpoint "multilingual" has no source
+  directory`). The replay loads `english` directly, as Laya's benchmark
+  does.
 
 ## oio measured (evidence harness)
 

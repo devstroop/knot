@@ -2,3 +2,4 @@
 .venv-demo/
 demo/logs/
 __pycache__/
+/training/out/

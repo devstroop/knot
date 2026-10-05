@@ -26,11 +26,15 @@ fn env_usize(name: &str, default: usize) -> usize {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
-        )
-        .init();
+    let mcp_mode = std::env::args().any(|a| a == "--mcp");
+    let subscriber = tracing_subscriber::fmt().with_env_filter(
+        tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
+    );
+    if mcp_mode {
+        subscriber.with_writer(std::io::stderr).init();
+    } else {
+        subscriber.init();
+    }
 
     let (source, dirs) = resolve_model_dirs(
         std::env::var("OIO_MODELS").as_deref().ok(),
@@ -93,7 +97,7 @@ async fn main() -> Result<()> {
     };
 
     let engine: Arc<dyn oio_serve::Predictor> = Arc::new(engine);
-    if std::env::args().any(|a| a == "--mcp") {
+    if mcp_mode {
         tracing::info!("oio-mcp stdio server");
         oio_serve::mcp::run_stdio(engine, tokio::io::stdin(), tokio::io::stdout()).await?;
         return Ok(());

@@ -17,6 +17,7 @@ operability, latency, strictness, and deployability.
 | `crates/oio-serve` | HTTP server binary (`/v1/systemone`, `/batch`, `/health`, `/models`) + MCP stdio mode |
 | `docs/` | PRD, plan, spec, compatibility, architecture, ADRs |
 | `scripts/` | Checkpoint fixture tooling |
+| `training/` | Optional research-only data preparation and frozen-head experiments |
 
 ## Requirements
 
@@ -80,6 +81,7 @@ curl -s localhost:8000/v1/systemone \
 | `OIO_DEFAULT_MODEL` | router fallback | Force the initial checkpoint |
 | `OIO_RUNTIME` | `onnx` | `onnx` or `candle` (native CPU) |
 | `OIO_DEVICE` | `cpu` | `cpu` or `cuda` (ort CUDA EP, needs a `cuda`-feature build — SPEC §10) |
+| `OIO_ORT_INTRA_THREADS` | ONNX Runtime default | Optional positive integer for ORT intra-op CPU threads |
 | `OIO_API_KEY` | unset | Require `Authorization: Bearer <key>` |
 | `OIO_MAX_CONCURRENT` | `16` | In-flight predicts per process |
 | `OIO_MAX_TOKEN_BUDGET` | `8192` | Token budget cap |
@@ -153,6 +155,8 @@ CI runs the first three on every push and pull request
 - [docs/SPEC.md](docs/SPEC.md) — invariants
 - [docs/COMPAT.md](docs/COMPAT.md) — Jev/Laya compatibility contract
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — crate layout and data flow
+- [docs/BENCHMARKING.md](docs/BENCHMARKING.md) — paired ONNX/Candle benchmark method
+- [docs/TRAINING.md](docs/TRAINING.md) — staged training pipeline, data policy, and smoke-test scope
 - [docs/GITA-DEMO.md](docs/GITA-DEMO.md) — local Gita retrieval + typed-decision prototype
 - [docs/JEV-WIRE.md](docs/JEV-WIRE.md) — reference notes on Laya's wire behaviour
 - [docs/ADR/](docs/ADR/) — decision records
