@@ -50,13 +50,23 @@ def main(argv=None):
     parser.add_argument("--author", default="Swami Sivananda")
     parser.add_argument("--eval-set", type=Path, default=DEFAULT_EVAL_SET)
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument(
+        "--min-query-overlap",
+        type=int,
+        default=1,
+        help="Require this many distinct query terms in a passage (default: 1)",
+    )
     args = parser.parse_args(argv)
     if args.top_k < 1 or args.top_k > 100:
         parser.error("--top-k must be between 1 and 100")
+    if args.min_query_overlap < 1:
+        parser.error("--min-query-overlap must be positive")
     try:
         passages = load_passages(args.gita_repo, args.author)
         cases = load_cases(args.eval_set)
-        report = evaluate_retrieval(BM25Index(passages), cases, args.top_k)
+        report = evaluate_retrieval(
+            BM25Index(passages), cases, args.top_k, args.min_query_overlap
+        )
         data_dir = args.gita_repo / "data"
         report["retriever"] = "bm25"
         report["corpus"] = {

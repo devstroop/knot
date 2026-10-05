@@ -97,6 +97,28 @@ class GitaDecisionDemoTests(unittest.TestCase):
         report = evaluate_retrieval(self.index, cases, top_k=3)
         self.assertEqual(report["unanswerable_no_evidence_rate"], 0.0)
 
+    def test_retrieval_eval_minimum_query_overlap_filter(self):
+        cases = [
+            {
+                "case_id": "answerable",
+                "query": "action fruits",
+                "answerable": True,
+                "relevant_citations": ["BG 2.47"],
+            },
+            {
+                "case_id": "generic-overlap",
+                "query": "action results",
+                "answerable": False,
+                "relevant_citations": [],
+            },
+        ]
+        report = evaluate_retrieval(
+            self.index, cases, top_k=3, min_query_overlap=2
+        )
+        self.assertEqual(report["minimum_query_overlap"], 2)
+        self.assertEqual(report["answerable_citation_recall_at_k"], 1.0)
+        self.assertEqual(report["unanswerable_no_evidence_rate"], 1.0)
+
     def test_main_skips_oio_when_retrieval_has_no_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
