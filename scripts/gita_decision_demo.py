@@ -194,6 +194,68 @@ class BM25Index:
         return results[:limit]
 
 
+class SemanticIndex:
+    def __init__(self, passages, model_name="sentence-transformers/all-MiniLM-L6-v2"):
+        if not passages:
+            raise ValueError("cannot index an empty passage list")
+        try:
+            from fastembed import TextEmbedding
+        except ImportError as exc:
+            raise RuntimeError(
+                "semantic retrieval requires FastEmbed; install "
+                "scripts/requirements-gita-semantic.txt"
+            ) from exc
+        self.passages = list(passages)
+        self.model_name = model_name
+        self.model = TextEmbedding(model_name=model_name)
+        self.embeddings = [
+            self._normalize(vector)
+            for vector in self.model.embed([passage.text for passage in self.passages])
+        ]
+        if len(self.embeddings) != len(self.passages):
+            raise RuntimeError("embedding model returned an unexpected passage count")
+        self.dimensions = len(self.embeddings[0])
+        if not self.dimensions or any(
+            len(vector) != self.dimensions for vector in self.embeddings
+        ):
+            raise RuntimeError("embedding model returned inconsistent vector dimensions")
+
+    @staticmethod
+    def _normalize(vector):
+        values = tuple(float(value) for value in vector)
+        if not values or any(not math.isfinite(value) for value in values):
+            raise ValueError("embedding model returned an empty or non-finite vector")
+        norm = math.sqrt(sum(value * value for value in values))
+        if not math.isfinite(norm) or norm == 0:
+            raise ValueError("embedding model returned a zero-length or invalid vector")
+        return tuple(value / norm for value in values)
+
+    def search(self, query, limit=5):
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query must not be empty")
+        query_vectors = list(self.model.embed([query]))
+        if len(query_vectors) != 1:
+            raise RuntimeError("embedding model returned an unexpected query count")
+        query_embedding = self._normalize(query_vectors[0])
+        if len(query_embedding) != self.dimensions:
+            raise RuntimeError("embedding model returned an inconsistent query dimension")
+        results = [
+            (
+                sum(left * right for left, right in zip(query_embedding, embedding)),
+                passage,
+            )
+            for passage, embedding in zip(self.passages, self.embeddings)
+        ]
+        results.sort(
+            key=lambda item: (
+                -item[0], item[1].chapter, item[1].verse, item[1].author
+            )
+        )
+        return results[:limit]
+
+
 def git_revision(repo):
     try:
         result = subprocess.run(
@@ -322,11 +384,13 @@ def corpus_metadata(gita_repo, author):
     }
 
 
-def evaluate_retrieval(index, cases, top_k, min_query_overlap=1):
+def evaluate_retrieval(index, cases, top_k, min_query_overlap=1, min_score=None):
     if top_k < 1:
         raise ValueError("top_k must be positive")
     if min_query_overlap < 1:
         raise ValueError("min_query_overlap must be positive")
+    if min_score is not None and not math.isfinite(min_score):
+        raise ValueError("min_score must be finite")
     seen_ids = set()
     seen_queries = set()
     answerable_total = 0
@@ -374,15 +438,17 @@ def evaluate_retrieval(index, cases, top_k, min_query_overlap=1):
                 % (case_id, ", ".join(sorted(unknown)))
             )
 
-        if min_query_overlap == 1:
+        if min_query_overlap == 1 and min_score is None:
             retrieved = index.search(query, top_k)
         else:
-            query_terms = set(tokenize(query))
             ranked = index.search(query, len(index.passages))
+            query_terms = set(tokenize(query)) if min_query_overlap > 1 else None
             retrieved = [
                 (score, passage)
                 for score, passage in ranked
-                if len(query_terms.intersection(passage.tokens)) >= min_query_overlap
+                if (query_terms is None or
+                    len(query_terms.intersection(passage.tokens)) >= min_query_overlap)
+                and (min_score is None or score >= min_score)
             ][:top_k]
         citations = [passage.citation for _, passage in retrieved]
         first_relevant_rank = next(
@@ -419,6 +485,7 @@ def evaluate_retrieval(index, cases, top_k, min_query_overlap=1):
     return {
         "top_k": top_k,
         "minimum_query_overlap": min_query_overlap,
+        "minimum_score": min_score,
         "case_count": len(evaluated),
         "answerable_case_count": answerable_total,
         "answerable_citation_recall_at_k": (
