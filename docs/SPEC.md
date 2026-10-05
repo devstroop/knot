@@ -156,9 +156,10 @@ downgrade (PRD §4).
 
 - `cpu` — the baseline path: any build, any machine.
 - `cuda` — ort's CUDA execution provider, behind the `cuda` feature
-  (`cargo build -p oio-serve --features cuda`). ONNX Runtime 1.28's CUDA
-  build ships CUDA 13 binaries: Turing (sm_75) or newer GPU, driver
-  r580+, cuDNN 9, ~2 GB VRAM. Requesting `cuda` on a build without the
+  (`cargo build -p oio-serve --features cuda`). The pinned ONNX Runtime
+  1.22 CUDA build ships CUDA 12 binaries: Turing (sm_75) or newer GPU,
+  a driver compatible with the installed CUDA 12 runtime, cuDNN 9, ~2 GB
+  VRAM. Requesting `cuda` on a build without the
   feature is a startup error naming the feature — never a CPU fallback.
   The feature and the provider are x86_64-Linux-only (ort ships no CUDA
   distributions elsewhere): every other target — Apple Silicon included —
