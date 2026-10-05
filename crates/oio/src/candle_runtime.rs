@@ -4,6 +4,8 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use candle_core::{D, DType, Device, Tensor};
 use candle_nn::{Embedding, LayerNorm, Linear, Module, VarBuilder};
@@ -14,6 +16,32 @@ use crate::runtime::{Calibration, Runtime};
 
 fn err(msg: impl Into<String>) -> Error {
     Error::Model(msg.into())
+}
+
+#[derive(Default)]
+struct CandleProfile {
+    calls: u64,
+    tensor_prep: Duration,
+    encoder: Duration,
+    decision_head: Duration,
+    classifier_and_copy: Duration,
+}
+
+impl CandleProfile {
+    fn report(&self) {
+        if self.calls == 0 {
+            return;
+        }
+        let avg_ms = |duration: Duration| duration.as_secs_f64() * 1e3 / self.calls as f64;
+        eprintln!(
+            "candle_profile calls={} avg_ms tensor_prep={:.2} encoder={:.2} decision_head={:.2} classifier_and_copy={:.2}",
+            self.calls,
+            avg_ms(self.tensor_prep),
+            avg_ms(self.encoder),
+            avg_ms(self.decision_head),
+            avg_ms(self.classifier_and_copy),
+        );
+    }
 }
 
 /// Mirror Laya's `_apply_rope_config`: transformers 5 stores per-layer-type
@@ -121,10 +149,24 @@ pub struct CandleRuntime {
     act_head: (Linear, Linear),
     config: serde_json::Value,
     calibration: Calibration,
+    profile: Option<Mutex<CandleProfile>>,
 }
 
 impl CandleRuntime {
     pub fn load(model_dir: &Path) -> Result<Self> {
+        let profile = match std::env::var("OIO_CANDLE_PROFILE") {
+            Ok(value) if value == "1" || value == "true" => {
+                Some(Mutex::new(CandleProfile::default()))
+            }
+            Ok(value) if value == "0" || value == "false" => None,
+            Ok(value) => {
+                return Err(err(format!(
+                    "OIO_CANDLE_PROFILE must be 0/1 or false/true, got {value:?}"
+                )));
+            }
+            Err(std::env::VarError::NotPresent) => None,
+            Err(e) => return Err(err(format!("read OIO_CANDLE_PROFILE: {e}"))),
+        };
         let device = Device::Cpu;
         let cfg_text =
             std::fs::read_to_string(model_dir.join("rl_agent_config.json")).map_err(Error::Io)?;
@@ -189,7 +231,36 @@ impl CandleRuntime {
             act_head: (act0, act2),
             config: cfg,
             calibration,
+            profile,
         })
+    }
+
+    fn record_profile(
+        &self,
+        tensor_prep: Duration,
+        encoder: Duration,
+        decision_head: Duration,
+        classifier_and_copy: Duration,
+    ) {
+        if let Some(profile) = &self.profile {
+            let mut profile = profile.lock().unwrap();
+            profile.calls += 1;
+            profile.tensor_prep += tensor_prep;
+            profile.encoder += encoder;
+            profile.decision_head += decision_head;
+            profile.classifier_and_copy += classifier_and_copy;
+        }
+    }
+}
+
+impl Drop for CandleRuntime {
+    fn drop(&mut self) {
+        if let Some(profile) = &self.profile {
+            match profile.lock() {
+                Ok(profile) => profile.report(),
+                Err(e) => eprintln!("candle_profile: failed to read profile: {e}"),
+            }
+        }
     }
 }
 
@@ -213,6 +284,7 @@ impl Runtime for CandleRuntime {
         num_markers: usize,
     ) -> Result<(Vec<Vec<f32>>, Vec<Vec<f32>>)> {
         let device = &self.device;
+        let tensor_prep_started = self.profile.as_ref().map(|_| Instant::now());
         let input_ids = Tensor::from_slice(input_ids, (batch, seq_len), device)
             .map_err(|e| err(format!("input_ids: {e}")))?
             .to_dtype(DType::U32)
@@ -230,10 +302,14 @@ impl Runtime for CandleRuntime {
             .to_dtype(DType::U32)
             .map_err(|e| err(format!("cast qtype: {e}")))?;
 
+        let tensor_prep = tensor_prep_started.map_or(Duration::ZERO, |t| t.elapsed());
+        let encoder_started = self.profile.as_ref().map(|_| Instant::now());
         let h = self
             .encoder
             .forward(&input_ids, &att)
             .map_err(|e| err(format!("encoder: {e}")))?;
+        let encoder = encoder_started.map_or(Duration::ZERO, |t| t.elapsed());
+        let decision_head_started = self.profile.as_ref().map(|_| Instant::now());
         let te = self.type_emb.forward(&qtype_t)?.unsqueeze(1)?;
         let h = h
             .broadcast_add(&te)
@@ -250,6 +326,8 @@ impl Runtime for CandleRuntime {
                 .map_err(|e| err(format!("head: {e}")))?;
         }
 
+        let decision_head = decision_head_started.map_or(Duration::ZERO, |t| t.elapsed());
+        let classifier_started = self.profile.as_ref().map(|_| Instant::now());
         let d = cur.dim(2)?;
         let idx = marker_pos_t
             .unsqueeze(2)?
@@ -320,6 +398,8 @@ impl Runtime for CandleRuntime {
             .to_dtype(DType::F32)
             .and_then(|t| t.to_vec2())
             .map_err(|e| err(format!("extract act: {e}")))?;
+        let classifier_and_copy = classifier_started.map_or(Duration::ZERO, |t| t.elapsed());
+        self.record_profile(tensor_prep, encoder, decision_head, classifier_and_copy);
         Ok((logits, act))
     }
 

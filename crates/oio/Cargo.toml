@@ -26,3 +26,6 @@ ort = { workspace = true, optional = true }
 candle-core = { workspace = true, optional = true }
 candle-nn = { workspace = true, optional = true }
 candle-transformers = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+candle-core = { workspace = true, optional = true, features = ["accelerate"] }
