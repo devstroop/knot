@@ -20,7 +20,9 @@ thiserror = "2"
 sha2 = "0.10"
 
 # Heavy/optional runtime deps (enabled per feature, see crates/*/Cargo.toml)
-ort = { version = "2.0.0-rc.13", default-features = false, features = ["std", "download-binaries", "tls-rustls"] }
+# ORT 1.28's Linux static archive requires newer glibc/libstdc++ than the
+# Ubuntu 22.04 baseline. Pin rc.10 (ORT 1.22) for the supported Linux ABI.
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "download-binaries"] }
 tokenizers = { version = "0.21" }
 axum = "0.8"
 candle-core = "0.11"
