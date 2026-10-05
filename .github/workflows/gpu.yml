@@ -26,8 +26,8 @@ name: GPU
 # T4 from ~$0.003/min spot). With the variable unset, only the free
 # preflight job runs and it fails with the message above.
 #
-# First run notes: ort's `cuda` feature downloads ONNX Runtime's CUDA 13
-# binaries (Turing sm_75+, driver r580+, cuDNN 9). If the runner image
+# First run notes: ort's `cuda` feature downloads ONNX Runtime's CUDA 12
+# binaries (Turing sm_75+, compatible driver, cuDNN 9). If the runner image
 # ships an older CUDA toolkit/driver, the build or the first CUDA test
 # fails with a linker/runtime message — the "GPU and toolchain versions"
 # step prints what the image actually has.

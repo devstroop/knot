@@ -225,13 +225,14 @@ impl OnnxRuntime {
             ));
         }
 
+        #[allow(unused_mut)]
         let mut builder = ort::session::Session::builder()
             .map_err(|e| Error::Model(format!("ort builder: {e}")))?;
 
         #[cfg(feature = "cuda")]
         if device == Device::Cuda {
-            use ort::ep::ExecutionProvider;
-            let cuda = ort::ep::CUDA::default();
+            use ort::execution_providers::{CUDAExecutionProvider, ExecutionProvider};
+            let cuda = CUDAExecutionProvider::default();
             match cuda.is_available() {
                 Ok(true) => {}
                 Ok(false) => {
@@ -255,8 +256,8 @@ impl OnnxRuntime {
                 .map_err(|e| {
                     Error::Model(format!(
                         "OIO_DEVICE=cuda: CUDA execution provider registration \
-                         failed: {e} (needs a Turing sm_75+ GPU, driver r580+, \
-                         CUDA 13 runtime, cuDNN 9)"
+                         failed: {e} (needs a Turing sm_75+ GPU, CUDA 12 runtime, \
+                         cuDNN 9 and a compatible driver)"
                     ))
                 })?;
         }
