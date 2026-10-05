@@ -18,6 +18,7 @@ from gita_decision_demo import (
     main,
     tokenize,
 )
+from evaluate_gita_retrieval import load_cases
 
 
 def passage(chapter, verse, text):
@@ -142,6 +143,22 @@ class GitaDecisionDemoTests(unittest.TestCase):
         self.assertEqual(report["minimum_score"], 100.0)
         self.assertEqual(report["answerable_citation_recall_at_k"], 0.0)
         self.assertEqual(report["unanswerable_no_evidence_rate"], 1.0)
+
+    def test_holdout_set_is_balanced_and_disjoint_from_development_set(self):
+        scripts_dir = Path(__file__).resolve().parent
+        holdout = load_cases(scripts_dir / "gita_retrieval_holdout.jsonl")
+        development = load_cases(scripts_dir / "gita_retrieval_eval.jsonl")
+        self.assertEqual(len(holdout), 24)
+        self.assertEqual(sum(case["answerable"] for case in holdout), 12)
+        self.assertEqual(sum(not case["answerable"] for case in holdout), 12)
+        self.assertFalse(
+            {case["case_id"] for case in holdout}
+            & {case["case_id"] for case in development}
+        )
+        self.assertFalse(
+            {case["query"] for case in holdout}
+            & {case["query"] for case in development}
+        )
 
     def test_semantic_index_ranks_cosine_similarities(self):
         class FakeTextEmbedding:
