@@ -229,6 +229,20 @@ impl OnnxRuntime {
         let mut builder = ort::session::Session::builder()
             .map_err(|e| Error::Model(format!("ort builder: {e}")))?;
 
+        if let Ok(value) = std::env::var("OIO_ORT_INTRA_THREADS") {
+            let threads = value.parse::<usize>().map_err(|e| {
+                Error::Model(format!("invalid OIO_ORT_INTRA_THREADS={value:?}: {e}"))
+            })?;
+            if threads == 0 {
+                return Err(Error::Model(
+                    "OIO_ORT_INTRA_THREADS must be greater than zero".into(),
+                ));
+            }
+            builder = builder
+                .with_intra_threads(threads)
+                .map_err(|e| Error::Model(format!("set ORT intra-op threads: {e}")))?;
+        }
+
         #[cfg(feature = "cuda")]
         if device == Device::Cuda {
             use ort::execution_providers::{CUDAExecutionProvider, ExecutionProvider};

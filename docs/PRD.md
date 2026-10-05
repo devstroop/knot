@@ -28,6 +28,7 @@ oio is a Rust implementation of the same decision-engine inference path, exposed
 | Operability | Env config (`OIO_*`), structured logs (tracing), pinned model revisions, digest verification, graceful shutdown |
 | Extensibility | `Runtime` trait: ONNX first, candle native later, own kernels after |
 | License/cost | Apache-2.0, zero per-token cost, CPU baseline (x86_64 Linux + macOS arm64), GPU opt-in via ort CUDA EP (`OIO_DEVICE=cuda`, x86_64 Linux) |
+| Model development | Reproducible, optional training experiments that produce a canonical checkpoint for both configured inference runtimes |
 
 ## 4. Non-goals (out of scope)
 
@@ -41,7 +42,7 @@ layer vs oio scope").
 | Hooks framework + hook MCP tools | oio refuses them by name on the MCP surface; a fixed inference path keeps responses auditable |
 | `structured.decide` API, presets | preset sugar over the single `/v1/systemone` contract; callers compose the same behaviour themselves |
 | Eval harnesses (`laya-evals` regression gate, per-language research reports) | oio gates on parity fixtures plus its own evidence harness (latency bench + golden replay); accuracy evals stay in Laya's research tree |
-| Training / fine-tuning, RLCD, calibration fitting, recipes (es_phone_turns 0.396 → 0.912) | consume Laya's published artifacts at a pinned revision + digest instead of rebuilding its research stack |
+| RLCD/online reward training, production calibration, broad hyperparameter sweeps, and model-quality claims from synthetic smoke data | keep stage one to a bounded, supervised CPU experiment; require licensed labels and separate held-out evaluation before release |
 | Compile fast-path (TileLang kernels, torch.compile) | no torch in the stack; kernels arrive later via the `Runtime` trait only if they pay for themselves |
 | Integrations: langchain/langgraph, LlamaIndex, CrewAI, TypeScript SDK | Laya keeps them; oio is a base-URL drop-in behind any HTTP or MCP client |
 | Automatic GPU selection (AMP, silent OOM→CPU fallback), WASM edge builds | CPU x86_64 Linux + Apple Silicon is the v1 baseline; ort CUDA EP is explicit opt-in behind `OIO_DEVICE=cuda` (SPEC §10) — automatic selection and silent fallback stay out |
@@ -84,6 +85,7 @@ replay), per the gap ranking at the end of `RESEARCH-COMPARE.md`.
 | N3 | Tokenizer access serialized (mirrors Laya's shared-lock semantics) |
 | N4 | No network at inference time; models fetched explicitly with pinned revision + digest check |
 | N5 | Test gates: fixture parity vs Laya ONNXAgent, unit tests per prompt-budget rule, clippy/rustfmt clean |
+| N6 | Training tools are optional and isolated from the Rust inference dependency graph; no training-time downloads or Python dependencies are required to build or serve OIO |
 
 ## 8. Success metrics (measurable, tracked in docs rounds)
 
