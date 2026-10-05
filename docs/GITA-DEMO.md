@@ -84,10 +84,59 @@ or independently validated benchmark. A nonzero lexical hit for an
 unanswerable question is a retrieval false positive, not evidence that the
 corpus answers it.
 
-BM25 remains the baseline. Compare future lexical, hybrid, or semantic
-retrievers against this same reviewed set, with retrieval Recall@k measured
-before evaluating OIO decisions. This first prototype does not include a
-semantic model or claim that lexical scores represent calibrated relevance.
+BM25 remains the default baseline. An optional local semantic baseline uses
+FastEmbed's ONNX Runtime implementation of
+[`sentence-transformers/all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
+The model card declares Apache-2.0; FastEmbed lists the model as 384-dimensional
+with a 256-token truncation length. Install the pinned optional dependency:
+
+```bash
+python3 -m venv .venv-gita-semantic
+. .venv-gita-semantic/bin/activate
+python3 -m pip install -r scripts/requirements-gita-semantic.txt
+```
+
+Run semantic retrieval locally against the same cases:
+
+```bash
+python3 scripts/evaluate_gita_retrieval.py \
+  --gita-repo ../gita \
+  --author "Swami Sivananda" \
+  --retriever semantic \
+  --model sentence-transformers/all-MiniLM-L6-v2 \
+  --top-k 5
+```
+
+FastEmbed downloads the public ONNX model on first use; embedding and retrieval
+then run locally. No query, corpus passage, or API credential is sent to a
+hosted inference service. The optional `--min-score` is a cosine-similarity
+cutoff for semantic retrieval (and a raw BM25-score cutoff for BM25); scores
+are retriever-specific and must not be compared across retrievers. For example:
+
+```bash
+python3 scripts/evaluate_gita_retrieval.py \
+  --gita-repo ../gita --author "Swami Sivananda" \
+  --retriever semantic --top-k 5 --min-score 0.35
+```
+
+With no cutoff, semantic search always returns its nearest passages, so
+unanswerable no-evidence rate is zero. Sweep cutoffs on this diagnostic set to
+inspect the recall/abstention tradeoff, but do not treat a threshold tuned on
+these cases as production-calibrated.
+
+Retrieval results should be compared before evaluating OIO decisions. The
+hand-authored set is a small diagnostic, not a representative or independently
+validated benchmark.
+
+On this set, unthresholded MiniLM at `k=5` achieved answerable-citation
+Recall@5 **0.750**, answerable-case Recall@5 **0.917**, MRR@5 **0.757**, and
+unanswerable no-evidence rate **0.000**. At cosine cutoff **0.35**, the first
+three metrics were unchanged and unanswerable no-evidence rose to **1.000**.
+On the same set, default BM25 scored **1.000**, **1.000**, **0.917**, and
+**0.417**, respectively; BM25 with at least two distinct query-term overlaps
+scored **1.000**, **1.000**, **0.917**, and **0.917**. The semantic model did
+not retrieve BG 6.35 for the restless-mind paraphrase, illustrating a remaining
+answerable miss. These results are descriptive of this small set only.
 
 On the expanded 24-case set for Swami Sivananda's English translation, BM25
 at `k=5` achieved answerable-citation Recall@5 **1.00**, answerable-case
