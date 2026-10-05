@@ -153,6 +153,7 @@ CI runs the first three on every push and pull request
 - [docs/SPEC.md](docs/SPEC.md) — invariants
 - [docs/COMPAT.md](docs/COMPAT.md) — Jev/Laya compatibility contract
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — crate layout and data flow
+- [docs/GITA-DEMO.md](docs/GITA-DEMO.md) — local Gita retrieval + typed-decision prototype
 - [docs/JEV-WIRE.md](docs/JEV-WIRE.md) — reference notes on Laya's wire behaviour
 - [docs/ADR/](docs/ADR/) — decision records
 
