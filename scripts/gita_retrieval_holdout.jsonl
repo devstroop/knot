@@ -1,0 +1,24 @@
+{"case_id":"holdout-desires-and-peace","query":"How does a person remain peaceful when many desires arise, like water flowing into a vast sea?","answerable":true,"relevant_citations":["BG 2.70","BG 2.71"]}
+{"case_id":"holdout-duty-based-giving","query":"Which kind of gift is offered from a sense of duty at the right time?","answerable":true,"relevant_citations":["BG 17.20"]}
+{"case_id":"holdout-pure-food","query":"What kind of food is considered nourishing by people of a pure nature?","answerable":true,"relevant_citations":["BG 17.8"]}
+{"case_id":"holdout-equal-vision","query":"How should wisdom see a learned scholar and an outcast with equal regard?","answerable":true,"relevant_citations":["BG 5.18"]}
+{"case_id":"holdout-knowledge-burns-action","query":"In what way does knowledge burn all actions like a blazing fire?","answerable":true,"relevant_citations":["BG 4.37"]}
+{"case_id":"holdout-own-vocation","query":"Why is it better to follow one's own calling imperfectly than perform someone else's perfectly?","answerable":true,"relevant_citations":["BG 3.35","BG 18.47"]}
+{"case_id":"holdout-devotion-realization","query":"What can single-hearted devotion enable a person to realize?","answerable":true,"relevant_citations":["BG 11.54","BG 9.13"]}
+{"case_id":"holdout-brahman-definition","query":"How is Brahman defined as the imperishable reality?","answerable":true,"relevant_citations":["BG 8.3"]}
+{"case_id":"holdout-withdraw-senses","query":"How can withdrawing the senses from their objects steady a person's understanding?","answerable":true,"relevant_citations":["BG 2.58","BG 2.68"]}
+{"case_id":"holdout-faith-and-nature","query":"What does the Gita say shapes a person's faith and inner nature?","answerable":true,"relevant_citations":["BG 17.3"]}
+{"case_id":"holdout-sustainer-of-worlds","query":"Who is described as pervading and sustaining the three worlds?","answerable":true,"relevant_citations":["BG 15.17"]}
+{"case_id":"holdout-simple-devotional-offering","query":"What simple gifts may be offered with a sincere heart?","answerable":true,"relevant_citations":["BG 9.26"]}
+{"case_id":"holdout-savings-rate","query":"Which savings account currently pays the highest annual percentage yield?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-ibuprofen-dose","query":"How many milligrams of ibuprofen should I take for a headache?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-nvidia-share-price","query":"What is the current price of Nvidia shares?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-kubernetes-probe","query":"How can I configure a Kubernetes readiness probe for a Go API?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-bird-camera","query":"Which compact camera is best for bird photography?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-train-schedule","query":"What time is the next train from Boston to New York?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-mortgage-calculation","query":"How do I calculate a mortgage amortization schedule?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-sourdough-recipe","query":"Can you give me a recipe for sourdough starter?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-champions-league-score","query":"What was the score in yesterday's Champions League match?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-tire-pressure","query":"What is the recommended tire pressure for a 2020 Honda Civic?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-wine-cleaning","query":"How do I remove red wine from a wool rug?","answerable":false,"relevant_citations":[]}
+{"case_id":"holdout-marathon-registration","query":"When does registration open for the Toronto marathon?","answerable":false,"relevant_citations":[]}

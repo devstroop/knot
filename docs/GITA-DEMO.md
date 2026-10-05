@@ -84,6 +84,30 @@ or independently validated benchmark. A nonzero lexical hit for an
 unanswerable question is a retrieval false positive, not evidence that the
 corpus answers it.
 
+## Frozen holdout
+
+`scripts/gita_retrieval_holdout.jsonl` is a separate 24-case set (12 answerable,
+12 unanswerable) with no repeated case IDs or question strings from the
+development set above. Its expected citations were checked against the local
+Swami Sivananda index. The queries span additional verse topics and new
+out-of-domain categories. Keep this file out of threshold/model selection;
+the values below were chosen on the development set before evaluating this
+holdout. It is still a small, single-author-authored diagnostic, not an
+independently adjudicated benchmark.
+
+Run the holdout with the default retriever:
+
+```bash
+python3 scripts/evaluate_gita_retrieval.py \
+  --gita-repo ../gita \
+  --author "Swami Sivananda" \
+  --eval-set scripts/gita_retrieval_holdout.jsonl \
+  --top-k 5
+```
+
+The report records the holdout file hash. The current SHA-256 is
+`bb6cf56dc9ba1cd5798a0997be0f0beab65c106fd5510bb37496ea47b19a1947`.
+
 BM25 remains the default baseline. An optional local semantic baseline uses
 FastEmbed's ONNX Runtime implementation of
 [`sentence-transformers/all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
@@ -145,7 +169,9 @@ Retrieval results should be compared before evaluating OIO decisions. The
 hand-authored set is a small diagnostic, not a representative or independently
 validated benchmark.
 
-On this set, unthresholded MiniLM at `k=5` achieved answerable-citation
+### Development-set retriever results
+
+On the development set, unthresholded MiniLM at `k=5` achieved answerable-citation
 Recall@5 **0.750**, answerable-case Recall@5 **0.917**, MRR@5 **0.757**, and
 unanswerable no-evidence rate **0.000**. At cosine cutoff **0.35**, the first
 three metrics were unchanged and unanswerable no-evidence rose to **1.000**.
@@ -155,12 +181,59 @@ scored **1.000**, **1.000**, **0.917**, and **0.917**. The semantic model did
 not retrieve BG 6.35 for the restless-mind paraphrase, illustrating a remaining
 answerable miss. These results are descriptive of this small set only.
 
-An exploratory hybrid sweep with `--semantic-weight 0.25 --rrf-k 60` and
+### Frozen configuration comparison on holdout
+
+All values below use `k=5` and the same holdout hash above. The BM25
+two-term filter, MiniLM `0.35` cosine cutoff, and hybrid weight `0.25`/RRF
+constant `60`/`0.015` cutoff were fixed from development-set experiments, not
+retuned on this holdout.
+
+| Configuration | Citation Recall@5 | Case Recall@5 | MRR@5 | Unanswerable no-evidence |
+|---|---:|---:|---:|---:|
+| BM25 default | 0.938 | 1.000 | 0.861 | 0.333 |
+| BM25, minimum 2 query-term overlaps | 0.875 | 0.917 | 0.833 | 1.000 |
+| MiniLM, no cutoff | 0.750 | 0.917 | 0.778 | 0.000 |
+| MiniLM, cosine cutoff 0.35 | 0.750 | 0.917 | 0.778 | 1.000 |
+| Hybrid, semantic weight 0.25, RRF k=60, no cutoff | 1.000 | 1.000 | 0.958 | 0.000 |
+| Hybrid, same fusion, cutoff 0.015 | 0.938 | 1.000 | 0.958 | 0.667 |
+
+Reproduce the fixed thresholded configurations on the same holdout with:
+
+```bash
+python3 scripts/evaluate_gita_retrieval.py --gita-repo ../gita \
+  --author "Swami Sivananda" --eval-set scripts/gita_retrieval_holdout.jsonl \
+  --top-k 5 --min-query-overlap 2
+
+python3 scripts/evaluate_gita_retrieval.py --gita-repo ../gita \
+  --author "Swami Sivananda" --eval-set scripts/gita_retrieval_holdout.jsonl \
+  --top-k 5 --retriever semantic --min-score 0.35
+
+python3 scripts/evaluate_gita_retrieval.py --gita-repo ../gita \
+  --author "Swami Sivananda" --eval-set scripts/gita_retrieval_holdout.jsonl \
+  --top-k 5 --retriever hybrid --semantic-weight 0.25 --rrf-k 60 \
+  --min-score 0.015
+```
+
+On this holdout, the fixed hybrid cutoff has the same citation recall as
+default BM25, a higher MRR, and a higher no-evidence rate, while the uncapped
+hybrid retrieves all cited verses but returns passages for every unanswerable
+query. MiniLM with its development-set cutoff abstains on all unanswerable
+cases, but has lower citation recall and MRR. This is a promising signal for
+hybrid ranking, not enough evidence to change defaults: twelve answerable and
+twelve unanswerable examples are too few to establish generalization, and the
+queries/citations have not been independently adjudicated. Expand and
+independently review the holdout before drawing a quality conclusion.
+
+### Development-set threshold ablations
+
+On the development set, an exploratory hybrid sweep with
+`--semantic-weight 0.25 --rrf-k 60` and
 `--min-score 0.015` returned answerable-citation Recall@5 **1.000**,
 answerable-case Recall@5 **1.000**, MRR@5 **0.917**, and unanswerable
 no-evidence rate **0.500**. This matches BM25 on the answerable metrics but is
-only a small change from its **0.417** unanswerable no-evidence rate; this set
-does not show a meaningful hybrid advantage. Reproduce it with:
+only a small change from its **0.417** unanswerable no-evidence rate; the
+development set does not show a meaningful hybrid advantage. Reproduce it
+with:
 
 ```bash
 python3 scripts/evaluate_gita_retrieval.py \
@@ -169,7 +242,7 @@ python3 scripts/evaluate_gita_retrieval.py \
   --top-k 5 --min-score 0.015
 ```
 
-On the expanded 24-case set for Swami Sivananda's English translation, BM25
+On the 24-case development set for Swami Sivananda's English translation, BM25
 at `k=5` achieved answerable-citation Recall@5 **1.00**, answerable-case
 Recall@5 **1.00**, MRR@5 **0.917**, and unanswerable no-evidence rate **0.417**
 (five of twelve out-of-domain queries had no positive lexical match). Seven
@@ -178,8 +251,9 @@ These are descriptive results on a small hand-authored set, not a general
 quality estimate; the false positives show that no-evidence abstention alone
 does not reliably establish that a query is answerable.
 
-An exploratory filter requiring at least two distinct query terms to overlap
-each returned passage raised the unanswerable no-evidence rate to **0.917**
+On the development set, an exploratory filter requiring at least two distinct
+query terms to overlap each returned passage raised the unanswerable
+no-evidence rate to **0.917**
 while preserving the other three metrics on this set. Requiring three terms
 raised no-evidence to **1.00** but reduced answerable-citation Recall@5 to
 **0.450**. Neither threshold is enabled by default: this tiny set is not enough
