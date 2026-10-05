@@ -322,9 +322,11 @@ def corpus_metadata(gita_repo, author):
     }
 
 
-def evaluate_retrieval(index, cases, top_k):
+def evaluate_retrieval(index, cases, top_k, min_query_overlap=1):
     if top_k < 1:
         raise ValueError("top_k must be positive")
+    if min_query_overlap < 1:
+        raise ValueError("min_query_overlap must be positive")
     seen_ids = set()
     seen_queries = set()
     answerable_total = 0
@@ -372,7 +374,16 @@ def evaluate_retrieval(index, cases, top_k):
                 % (case_id, ", ".join(sorted(unknown)))
             )
 
-        retrieved = index.search(query, top_k)
+        if min_query_overlap == 1:
+            retrieved = index.search(query, top_k)
+        else:
+            query_terms = set(tokenize(query))
+            ranked = index.search(query, len(index.passages))
+            retrieved = [
+                (score, passage)
+                for score, passage in ranked
+                if len(query_terms.intersection(passage.tokens)) >= min_query_overlap
+            ][:top_k]
         citations = [passage.citation for _, passage in retrieved]
         first_relevant_rank = next(
             (rank for rank, citation in enumerate(citations, 1) if citation in expected),
@@ -407,6 +418,7 @@ def evaluate_retrieval(index, cases, top_k):
         raise ValueError("evaluation set contains no cases")
     return {
         "top_k": top_k,
+        "minimum_query_overlap": min_query_overlap,
         "case_count": len(evaluated),
         "answerable_case_count": answerable_total,
         "answerable_citation_recall_at_k": (

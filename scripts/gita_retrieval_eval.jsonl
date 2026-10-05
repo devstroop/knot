@@ -2,5 +2,23 @@
 {"case_id":"raise-the-self","query":"How can a person raise themselves through their own self?","answerable":true,"relevant_citations":["BG 6.5"]}
 {"case_id":"friendliness-and-hatred","query":"What does the text say about being free from hatred and friendly to all beings?","answerable":true,"relevant_citations":["BG 12.13"]}
 {"case_id":"action-without-reward","query":"How are actions without desire for reward described?","answerable":true,"relevant_citations":["BG 18.23","BG 17.11"]}
+{"case_id":"paraphrase-restless-mind","query":"How can practice and detachment help control an unsettled mind?","answerable":true,"relevant_citations":["BG 6.35"]}
+{"case_id":"balanced-success-failure","query":"What attitude should I keep in success and failure?","answerable":true,"relevant_citations":["BG 2.48","BG 18.26","BG 4.22"]}
+{"case_id":"moderation-eating-sleeping","query":"What guidance does the Gita give about eating and sleeping in yoga?","answerable":true,"relevant_citations":["BG 6.16","BG 6.17"]}
+{"case_id":"anger-and-judgment","query":"What happens when anger destroys memory and judgment?","answerable":true,"relevant_citations":["BG 2.63"]}
+{"case_id":"soul-and-death","query":"Why does the Gita say the soul is not killed when the body dies?","answerable":true,"relevant_citations":["BG 2.20"]}
+{"case_id":"actions-driven-by-gain","query":"Does the Gita distinguish actions driven by desire for gain?","answerable":true,"relevant_citations":["BG 18.24"]}
+{"case_id":"friend-and-foe","query":"How should one behave toward friend and foe alike?","answerable":true,"relevant_citations":["BG 14.25","BG 6.9","BG 12.18"]}
+{"case_id":"qualities-of-dear-devotee","query":"What qualities make a devotee dear to Krishna?","answerable":true,"relevant_citations":["BG 12.14"]}
 {"case_id":"mobile-banking-programming","query":"Which programming language should I use for a mobile banking application?","answerable":false,"relevant_citations":[]}
 {"case_id":"bitcoin-price","query":"What is the current Bitcoin exchange price in USD?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-overlap-javascript-framework","query":"Which JavaScript framework should I use to build a bank app?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-overlap-protein","query":"How many grams of protein should I eat to gain muscle?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-overlap-compound-interest","query":"How do I calculate compound interest on a loan?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-overlap-investment-return","query":"Which investment will have the highest return this year?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-overlap-weather-rain","query":"Will it rain in Seattle next weekend?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-overlap-cloud-hosting","query":"Which cloud provider is best for hosting a web app?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-no-overlap-recipe","query":"Can you recommend a recipe for lentil soup?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-no-overlap-laptop","query":"Which laptop should I buy for video editing?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-no-overlap-rust-error","query":"How do I debug a Rust lifetime error?","answerable":false,"relevant_citations":[]}
+{"case_id":"ood-no-overlap-france-capital","query":"What is the capital of France?","answerable":false,"relevant_citations":[]}

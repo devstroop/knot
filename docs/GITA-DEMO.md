@@ -67,14 +67,21 @@ python3 scripts/evaluate_gita_retrieval.py \
   --top-k 5
 ```
 
-The set in `scripts/gita_retrieval_eval.jsonl` has four answerable questions
-with reviewed relevant citations and two intentionally out-of-domain
-questions. Its JSON report includes answerable citation Recall@k, answerable
-case Recall@k, MRR@k, and the rate at which unanswerable queries produce no
-positive lexical match. It reports retrieval only; these numbers do not measure
-OIO's decision quality. Review and expand the questions and citations before
-using the results as a quality claim. In particular, a nonzero lexical hit for
-an unanswerable question is a retrieval false positive, not evidence that the
+Use `--min-query-overlap 2` to reproduce the simple overlap-filter ablation
+below. This option affects retrieval evaluation only; the live demo continues
+to use the default BM25 behavior.
+
+The set in `scripts/gita_retrieval_eval.jsonl` has twelve answerable questions
+with reviewed relevant citations, including paraphrases and several topics,
+plus twelve intentionally out-of-domain questions. The latter include
+generic-word-overlap challenges (for example, finance, weather, and software
+queries) as well as queries with little expected lexical overlap. Its JSON
+report includes answerable citation Recall@k, answerable case Recall@k, MRR@k,
+and the rate at which unanswerable queries produce no positive lexical match.
+It reports retrieval only; these numbers do not measure OIO's decision
+quality. This remains a small hand-authored diagnostic set, not a representative
+or independently validated benchmark. A nonzero lexical hit for an
+unanswerable question is a retrieval false positive, not evidence that the
 corpus answers it.
 
 BM25 remains the baseline. Compare future lexical, hybrid, or semantic
@@ -82,12 +89,23 @@ retrievers against this same reviewed set, with retrieval Recall@k measured
 before evaluating OIO decisions. This first prototype does not include a
 semantic model or claim that lexical scores represent calibrated relevance.
 
-On the initial six-case set for Swami Sivananda's English translation, BM25
+On the expanded 24-case set for Swami Sivananda's English translation, BM25
 at `k=5` achieved answerable-citation Recall@5 **1.00**, answerable-case
-Recall@5 **1.00**, MRR@5 **0.875**, and unanswerable no-evidence rate **0.50**
-(one of two out-of-domain queries still matched generic words). These are
-descriptive smoke metrics on a tiny hand-authored set, not a general quality
-estimate.
+Recall@5 **1.00**, MRR@5 **0.917**, and unanswerable no-evidence rate **0.417**
+(five of twelve out-of-domain queries had no positive lexical match). Seven
+unanswerable queries still retrieved passages through generic word overlap.
+These are descriptive results on a small hand-authored set, not a general
+quality estimate; the false positives show that no-evidence abstention alone
+does not reliably establish that a query is answerable.
+
+An exploratory filter requiring at least two distinct query terms to overlap
+each returned passage raised the unanswerable no-evidence rate to **0.917**
+while preserving the other three metrics on this set. Requiring three terms
+raised no-evidence to **1.00** but reduced answerable-citation Recall@5 to
+**0.450**. Neither threshold is enabled by default: this tiny set is not enough
+to tune a production relevance threshold, and the filter is still lexical, not
+a semantic retriever. Reproduce the ablations with `--min-query-overlap 2`
+and `--min-query-overlap 3`, respectively.
 
 ## Scope and limitations
 
