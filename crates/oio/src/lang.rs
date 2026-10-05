@@ -569,8 +569,8 @@ fn leaf_non_english(leaf: &str) -> Option<Analysis> {
                 continue;
             }
         } else if det.script != "latin" && det.script != "unknown" {
-            if !(!non_latin_words(sample).is_empty()
-                && sample.chars().filter(|c| c.is_alphabetic()).count() >= NON_LATIN_MIN_LETTERS)
+            if non_latin_words(sample).is_empty()
+                || sample.chars().filter(|c| c.is_alphabetic()).count() < NON_LATIN_MIN_LETTERS
             {
                 continue;
             }
