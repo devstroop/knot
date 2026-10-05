@@ -10,6 +10,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from gita_decision_demo import (
         BM25Index,
+        HybridIndex,
         SemanticIndex,
         evaluate_retrieval,
         git_revision,
@@ -19,6 +20,7 @@ if __package__ in (None, ""):
 else:
     from .gita_decision_demo import (
         BM25Index,
+        HybridIndex,
         SemanticIndex,
         evaluate_retrieval,
         git_revision,
@@ -52,7 +54,9 @@ def main(argv=None):
     parser.add_argument("--author", default="Swami Sivananda")
     parser.add_argument("--eval-set", type=Path, default=DEFAULT_EVAL_SET)
     parser.add_argument("--top-k", type=int, default=5)
-    parser.add_argument("--retriever", choices=("bm25", "semantic"), default="bm25")
+    parser.add_argument(
+        "--retriever", choices=("bm25", "semantic", "hybrid"), default="bm25"
+    )
     parser.add_argument(
         "--model",
         default="sentence-transformers/all-MiniLM-L6-v2",
@@ -69,21 +73,45 @@ def main(argv=None):
         type=float,
         help="Only evaluate results at or above this retriever-specific score",
     )
+    parser.add_argument(
+        "--semantic-weight",
+        type=float,
+        default=0.5,
+        help="Hybrid only: weight of semantic rank in reciprocal-rank fusion (0-1)",
+    )
+    parser.add_argument(
+        "--rrf-k",
+        type=int,
+        default=60,
+        help="Hybrid only: reciprocal-rank fusion constant",
+    )
     args = parser.parse_args(argv)
     if args.top_k < 1 or args.top_k > 100:
         parser.error("--top-k must be between 1 and 100")
     if args.min_query_overlap < 1:
         parser.error("--min-query-overlap must be positive")
-    if args.retriever == "semantic" and args.min_query_overlap != 1:
+    if args.retriever != "bm25" and args.min_query_overlap != 1:
         parser.error("--min-query-overlap is available only with --retriever bm25")
+    if not 0 <= args.semantic_weight <= 1:
+        parser.error("--semantic-weight must be between 0 and 1")
+    if args.rrf_k < 1:
+        parser.error("--rrf-k must be positive")
     try:
         passages = load_passages(args.gita_repo, args.author)
         cases = load_cases(args.eval_set)
-        index = (
-            BM25Index(passages)
-            if args.retriever == "bm25"
-            else SemanticIndex(passages, args.model)
-        )
+        bm25_index = BM25Index(passages)
+        if args.retriever == "bm25":
+            index = bm25_index
+        elif args.retriever == "semantic":
+            index = SemanticIndex(passages, args.model)
+        else:
+            semantic_index = SemanticIndex(passages, args.model)
+            index = HybridIndex(
+                bm25_index,
+                semantic_index,
+                args.semantic_weight,
+                args.rrf_k,
+            )
         report = evaluate_retrieval(
             index,
             cases,
@@ -93,8 +121,11 @@ def main(argv=None):
         )
         data_dir = args.gita_repo / "data"
         report["retriever"] = args.retriever
-        if args.retriever == "semantic":
+        if args.retriever in {"semantic", "hybrid"}:
             report["embedding_model"] = args.model
+        if args.retriever == "hybrid":
+            report["semantic_weight"] = args.semantic_weight
+            report["rrf_k"] = args.rrf_k
         report["corpus"] = {
             "repository": "https://github.com/itsalfredashu/gita",
             "revision": git_revision(args.gita_repo),

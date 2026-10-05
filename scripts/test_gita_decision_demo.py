@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from gita_decision_demo import (
     BM25Index,
+    HybridIndex,
     Passage,
     SemanticIndex,
     build_request,
@@ -169,6 +170,68 @@ class GitaDecisionDemoTests(unittest.TestCase):
     def test_semantic_index_reports_missing_optional_dependency(self):
         with patch.dict(sys.modules, {"fastembed": None}):
             with self.assertRaisesRegex(RuntimeError, "requirements-gita-semantic"):
+                SemanticIndex(self.passages)
+
+    def test_hybrid_index_fuses_ranks_and_omits_zero_score_lexical_passages(self):
+        class FakeSemanticIndex:
+            def __init__(self, passages):
+                self.passages = list(passages)
+
+            def search(self, query, limit):
+                return [
+                    (0.9, self.passages[1]),
+                    (0.8, self.passages[0]),
+                    (0.7, self.passages[2]),
+                ][:limit]
+
+        semantic = FakeSemanticIndex(self.passages)
+        index = HybridIndex(
+            self.index,
+            semantic,
+            semantic_weight=0.5,
+            reciprocal_rank_constant=1,
+        )
+        ranked = index.search("action", limit=3)
+        self.assertEqual(ranked[0][1].citation, "BG 2.47")
+        self.assertGreater(ranked[0][0], ranked[1][0])
+        self.assertEqual(len(ranked), 3)
+
+    def test_hybrid_index_rejects_invalid_configuration(self):
+        class FakeSemanticIndex:
+            def __init__(self, passages):
+                self.passages = list(passages)
+
+        with self.assertRaisesRegex(ValueError, "between 0 and 1"):
+            HybridIndex(self.index, FakeSemanticIndex(self.passages), 1.1)
+        with self.assertRaisesRegex(ValueError, "positive"):
+            HybridIndex(
+                self.index,
+                FakeSemanticIndex(self.passages),
+                reciprocal_rank_constant=0,
+            )
+
+    def test_hybrid_index_requires_identical_passage_sets(self):
+        class FakeSemanticIndex:
+            def __init__(self, passages):
+                self.passages = list(passages)
+
+        with self.assertRaisesRegex(ValueError, "same passages"):
+            HybridIndex(
+                self.index,
+                FakeSemanticIndex(self.passages[:-1]),
+            )
+
+    def test_semantic_index_rejects_empty_embedding_results(self):
+        class EmptyTextEmbedding:
+            def __init__(self, model_name):
+                pass
+
+            def embed(self, texts):
+                return iter(())
+
+        fake_fastembed = types.SimpleNamespace(TextEmbedding=EmptyTextEmbedding)
+        with patch.dict(sys.modules, {"fastembed": fake_fastembed}):
+            with self.assertRaisesRegex(RuntimeError, "no passage embeddings"):
                 SemanticIndex(self.passages)
 
     def test_main_skips_oio_when_retrieval_has_no_evidence(self):
