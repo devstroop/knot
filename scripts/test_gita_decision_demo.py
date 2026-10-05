@@ -1,7 +1,9 @@
 import contextlib
 import io
 import json
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +11,7 @@ from unittest.mock import patch
 from gita_decision_demo import (
     BM25Index,
     Passage,
+    SemanticIndex,
     build_request,
     evaluate_retrieval,
     main,
@@ -118,6 +121,55 @@ class GitaDecisionDemoTests(unittest.TestCase):
         self.assertEqual(report["minimum_query_overlap"], 2)
         self.assertEqual(report["answerable_citation_recall_at_k"], 1.0)
         self.assertEqual(report["unanswerable_no_evidence_rate"], 1.0)
+
+    def test_retrieval_eval_minimum_score_filter(self):
+        cases = [
+            {
+                "case_id": "answerable",
+                "query": "mind",
+                "answerable": True,
+                "relevant_citations": ["BG 6.5"],
+            },
+            {
+                "case_id": "unanswerable",
+                "query": "minds",
+                "answerable": False,
+                "relevant_citations": [],
+            },
+        ]
+        report = evaluate_retrieval(self.index, cases, top_k=3, min_score=100.0)
+        self.assertEqual(report["minimum_score"], 100.0)
+        self.assertEqual(report["answerable_citation_recall_at_k"], 0.0)
+        self.assertEqual(report["unanswerable_no_evidence_rate"], 1.0)
+
+    def test_semantic_index_ranks_cosine_similarities(self):
+        class FakeTextEmbedding:
+            def __init__(self, model_name):
+                self.model_name = model_name
+
+            def embed(self, texts):
+                for text in texts:
+                    lowered = text.lower()
+                    if "mind" in lowered:
+                        yield [0.0, 2.0]
+                    elif "action" in lowered:
+                        yield [3.0, 0.0]
+                    else:
+                        yield [1.0, 1.0]
+
+        fake_fastembed = types.SimpleNamespace(TextEmbedding=FakeTextEmbedding)
+        with patch.dict(sys.modules, {"fastembed": fake_fastembed}):
+            index = SemanticIndex(self.passages, "test-model")
+            ranked = index.search("mind", limit=3)
+        self.assertEqual(index.model_name, "test-model")
+        self.assertEqual(ranked[0][1].citation, "BG 6.5")
+        self.assertAlmostEqual(ranked[0][0], 1.0)
+        self.assertAlmostEqual(ranked[1][0], 0.70710678)
+
+    def test_semantic_index_reports_missing_optional_dependency(self):
+        with patch.dict(sys.modules, {"fastembed": None}):
+            with self.assertRaisesRegex(RuntimeError, "requirements-gita-semantic"):
+                SemanticIndex(self.passages)
 
     def test_main_skips_oio_when_retrieval_has_no_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
