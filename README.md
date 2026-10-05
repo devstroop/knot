@@ -157,6 +157,7 @@ CI runs the first three on every push and pull request
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — crate layout and data flow
 - [docs/BENCHMARKING.md](docs/BENCHMARKING.md) — paired ONNX/Candle benchmark method
 - [docs/TRAINING.md](docs/TRAINING.md) — staged training pipeline, data policy, and smoke-test scope
+- [docs/GITA-DEMO.md](docs/GITA-DEMO.md) — local Gita retrieval + typed-decision prototype
 - [docs/JEV-WIRE.md](docs/JEV-WIRE.md) — reference notes on Laya's wire behaviour
 - [docs/ADR/](docs/ADR/) — decision records
 
