@@ -212,6 +212,8 @@ class SemanticIndex:
             self._normalize(vector)
             for vector in self.model.embed([passage.text for passage in self.passages])
         ]
+        if not self.embeddings:
+            raise RuntimeError("embedding model returned no passage embeddings")
         if len(self.embeddings) != len(self.passages):
             raise RuntimeError("embedding model returned an unexpected passage count")
         self.dimensions = len(self.embeddings[0])
@@ -247,6 +249,56 @@ class SemanticIndex:
                 passage,
             )
             for passage, embedding in zip(self.passages, self.embeddings)
+        ]
+        results.sort(
+            key=lambda item: (
+                -item[0], item[1].chapter, item[1].verse, item[1].author
+            )
+        )
+        return results[:limit]
+
+
+class HybridIndex:
+    def __init__(
+        self,
+        bm25_index,
+        semantic_index,
+        semantic_weight=0.5,
+        reciprocal_rank_constant=60,
+    ):
+        if not 0 <= semantic_weight <= 1:
+            raise ValueError("semantic_weight must be between 0 and 1")
+        if reciprocal_rank_constant < 1:
+            raise ValueError("reciprocal_rank_constant must be positive")
+        if bm25_index.passages != semantic_index.passages:
+            raise ValueError("hybrid indexes must contain the same passages in the same order")
+        self.passages = list(bm25_index.passages)
+        self.bm25_index = bm25_index
+        self.semantic_index = semantic_index
+        self.semantic_weight = semantic_weight
+        self.reciprocal_rank_constant = reciprocal_rank_constant
+
+    def search(self, query, limit=5):
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        rank_constant = self.reciprocal_rank_constant
+        fused_scores = collections.defaultdict(float)
+
+        for weight, index in (
+            (1 - self.semantic_weight, self.bm25_index),
+            (self.semantic_weight, self.semantic_index),
+        ):
+            if weight == 0:
+                continue
+            for rank, (score, passage) in enumerate(
+                index.search(query, len(self.passages)), 1
+            ):
+                fused_scores[passage] += weight / (rank_constant + rank)
+
+        results = [
+            (score, passage)
+            for passage, score in fused_scores.items()
+            if score > 0
         ]
         results.sort(
             key=lambda item: (

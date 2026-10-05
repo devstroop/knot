@@ -107,6 +107,23 @@ python3 scripts/evaluate_gita_retrieval.py \
   --top-k 5
 ```
 
+The evaluator also supports reciprocal-rank fusion of BM25 and MiniLM:
+
+```bash
+python3 scripts/evaluate_gita_retrieval.py \
+  --gita-repo ../gita \
+  --author "Swami Sivananda" \
+  --retriever hybrid \
+  --semantic-weight 0.5 \
+  --rrf-k 60 \
+  --top-k 5
+```
+
+`--semantic-weight` controls the semantic share from 0 (BM25 ranks only) to 1
+(semantic ranks only). Reciprocal-rank fusion avoids mixing BM25 and cosine
+score scales. The fused score is rank-derived and still needs its own cutoff
+evaluation; BM25 and cosine cutoffs are not interchangeable.
+
 FastEmbed downloads the public ONNX model on first use; embedding and retrieval
 then run locally. No query, corpus passage, or API credential is sent to a
 hosted inference service. The optional `--min-score` is a cosine-similarity
@@ -137,6 +154,20 @@ On the same set, default BM25 scored **1.000**, **1.000**, **0.917**, and
 scored **1.000**, **1.000**, **0.917**, and **0.917**. The semantic model did
 not retrieve BG 6.35 for the restless-mind paraphrase, illustrating a remaining
 answerable miss. These results are descriptive of this small set only.
+
+An exploratory hybrid sweep with `--semantic-weight 0.25 --rrf-k 60` and
+`--min-score 0.015` returned answerable-citation Recall@5 **1.000**,
+answerable-case Recall@5 **1.000**, MRR@5 **0.917**, and unanswerable
+no-evidence rate **0.500**. This matches BM25 on the answerable metrics but is
+only a small change from its **0.417** unanswerable no-evidence rate; this set
+does not show a meaningful hybrid advantage. Reproduce it with:
+
+```bash
+python3 scripts/evaluate_gita_retrieval.py \
+  --gita-repo ../gita --author "Swami Sivananda" \
+  --retriever hybrid --semantic-weight 0.25 --rrf-k 60 \
+  --top-k 5 --min-score 0.015
+```
 
 On the expanded 24-case set for Swami Sivananda's English translation, BM25
 at `k=5` achieved answerable-citation Recall@5 **1.00**, answerable-case
