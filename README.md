@@ -9,10 +9,6 @@ Non-autoregressive "System 1" decisions over typed questions (`choice` / `score`
 in one forward pass. Laya (Python) is the research reference; knot targets
 operability, latency, strictness, and deployability.
 
-> **knot** is the decision engine of [OIO (Open Intelligence Operations)](docs/BRAND.md) —
-> oio wires the pipeline, nqlite supplies the evidence, and knot resolves it.
-> Previously named `oio`: upgrading? See [docs/MIGRATION.md](docs/MIGRATION.md).
-
 ## Layout
 
 | Path | Contents |
