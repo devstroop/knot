@@ -109,7 +109,10 @@ calibration has not been refit and final-test evaluation is not part of this
 smoke command. Never replace a release checkpoint with this output.
 
 The run manifest records the selected source IDs, seeds, split hashes, base
-checkpoint path, and trainable parameter count. A later quality experiment
+checkpoint path, and trainable parameter count. Step loss is printed during
+training, and each epoch's weights are saved (`experimental-model-epochN`)
+with a validation evaluation recorded in the manifest, so the epoch used for
+any later test comparison is a validation choice, never a test choice. A later quality experiment
 must separately define and freeze model-selection, calibration, and test
 protocols; compare against the unchanged base checkpoint; report per-primitive
 metrics and confidence calibration; and pass both ONNX and Candle parity gates
@@ -275,6 +278,37 @@ step, so a full-corpus CPU epoch is measured in hours. Record the selected data
 volume and wall-clock time in the run manifest so runs stay comparable, and
 treat a subset run as a declared subset — never report it as a full-corpus
 result.
+
+### Recorded test comparison (frozen)
+
+Run after the recipe froze (2 epochs, lr 1e-4, full splits, seed 20260611):
+the base checkpoint and the epoch-2 weights were evaluated exactly once each
+on the held-out `test` split (12,003 rows) with the same evaluator and cached
+features. Base weights `891102d37268…`; trained weights `67b21817c119…`
+(`experimental-model-epoch2.safetensors`). Epoch 2 was selected on validation
+(0.7206) over epoch 1 (0.6801), both above the 0.5764 baseline.
+
+| Slice | Base | Trained (epoch 2) | Gate | Verdict |
+|---|---:|---:|---|---|
+| `choice`, all (n=6,054) | 0.4096 | 0.4486 (+0.039) | G1 ≥ +0.01 | PASS |
+| `choice`, MASSIVE (n=2,974) | 0.4398 | 0.5020 | G2 no regression | PASS |
+| `choice`, BANKING77 (n=3,080) | 0.3805 | 0.3971 | G2 no regression | PASS |
+| `noul` accuracy (n=5,948) | 0.6817 | 0.8993 | — | — |
+| `noul` Brier | 0.5624 | 0.1475 | G3 ≤ base | PASS |
+| `noul` ECE | 0.2584 | 0.0069 | G3 ≤ base | PASS |
+| `score` (n=1) | 1.0 | 1.0 | G4 excluded | n/a |
+| overall | 0.5445 | 0.6720 | — | — |
+
+**Verdict: stage one is a held-out gain — all gates pass.** The trained head
+adds 3.9 points of choice accuracy and, more strikingly, takes derived-`noul`
+from overconfident (0.94 confidence at 0.69 accuracy) to calibrated
+(Brier 0.1475, ECE 0.0069). `score` remains a single synthetic case and gates
+nothing. Not claimed here: calibration refit, dual-runtime export/parity, or
+deployability — those stay future work under G6.
+
+The full JSON reports live in ignored `training/out/test-base.json` and
+`training/out/test-trained-epoch2.json`. Do not edit these numbers by hand;
+do not re-run test evaluation to shop for better thresholds.
 
 ## Future stages
 
