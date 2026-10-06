@@ -2,9 +2,9 @@
 """Spike: drive nqlite hybrid retrieval over the Gita corpus and score it.
 
 Owns a single `nql-server --stdio` subprocess: ingests the 701-verse English
-translation (with local MiniLM embeddings), then runs the oio English
+translation (with local MiniLM embeddings), then runs the knot English
 retrieval eval sets through nqlite's hybrid query and reports the same
-Recall/MRR metrics oio uses. Answerable metrics go through oio's
+Recall/MRR metrics knot uses. Answerable metrics go through knot's
 `evaluate_retrieval` via a small index shim; unanswerable abstention is
 measured separately with a BM25-positive companion query, because nqlite
 always returns its top-k rows (fused RRF scores are never zero).
@@ -117,7 +117,7 @@ def ingest(server, model, passages):
 
 
 class NqliteHybridIndex:
-    """oio `evaluate_retrieval` shim over nqlite hybrid queries."""
+    """knot `evaluate_retrieval` shim over nqlite hybrid queries."""
 
     def __init__(self, server, model, passages):
         self.server = server

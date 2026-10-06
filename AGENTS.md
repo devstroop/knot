@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Context for AI coding assistants working in the oio repository.
+Context for AI coding assistants working in the knot repository.
 
 ## Do NOT
 
@@ -16,7 +16,7 @@ Context for AI coding assistants working in the oio repository.
 cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo test --workspace
-cargo check -p oio            # fast path: no ort/tokenizers/axum
+cargo check -p knot            # fast path: no ort/tokenizers/axum
 ```
 
 CI (`.github/workflows/ci.yml`) runs the first three on every push to `main`
@@ -27,7 +27,7 @@ themselves when no checkpoint is available, so "green" is only meaningful with
 one set:
 
 ```bash
-OIO_MODEL_DIR=/path/to/laya-english cargo test --workspace
+KNOT_MODEL_DIR=/path/to/laya-english cargo test --workspace
 ```
 
 ## Where to look

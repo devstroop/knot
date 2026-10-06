@@ -1,13 +1,13 @@
-# Gita retrieval + OIO decision demo
+# Gita retrieval + KNOT decision demo
 
 This optional local demo uses the authorized clone at
 [itsalfredashu/gita](https://github.com/itsalfredashu/gita) as a small,
-attributed knowledge source. It demonstrates retrieval followed by an OIO
+attributed knowledge source. It demonstrates retrieval followed by an KNOT
 typed decision; it does **not** train a model or make the full corpus part of
-OIO's runtime artifacts.
+KNOT's runtime artifacts.
 
 The first version indexes the English translation by Swami Sivananda and uses
-simple lexical BM25 retrieval. OIO then makes one of three decisions over the
+simple lexical BM25 retrieval. KNOT then makes one of three decisions over the
 retrieved evidence:
 
 - `choice`: select the most relevant cited verse;
@@ -17,25 +17,25 @@ retrieved evidence:
 
 The demo prints the answer with chapter/verse citation, translation author,
 retrieval score, source repository revision, and hashes for the source data.
-It sends only the query and retrieved excerpts to OIO. It does not retrieve or
+It sends only the query and retrieved excerpts to KNOT. It does not retrieve or
 send the full commentary archive.
 
 When BM25 finds no positive-scoring passage, the demo returns
-`"no_evidence": true` with `"decision": null` and does not call OIO. This
+`"no_evidence": true` with `"decision": null` and does not call KNOT. This
 prevents a zero-score tie from being presented as a meaningful candidate
 choice. In `choice` mode, fewer than two positive candidates also produces no
-decision and does not call OIO (`"insufficient_candidates": true`); `score` and
+decision and does not call KNOT (`"insufficient_candidates": true`); `score` and
 `noul` can evaluate a single retrieved passage.
 
 ## Run
 
-1. Start OIO with a locally available checkpoint:
+1. Start KNOT with a locally available checkpoint:
 
    ```bash
-   OIO_MODEL_DIR=/path/to/laya-english cargo run -p oio-serve
+   KNOT_MODEL_DIR=/path/to/laya-english cargo run -p knot-serve
    ```
 
-2. From the OIO repository root, ask a question:
+2. From the KNOT repository root, ask a question:
 
    ```bash
    python3 scripts/gita_decision_demo.py \
@@ -47,7 +47,7 @@ decision and does not call OIO (`"insufficient_candidates": true`); `score` and
    `--mode score|noul` and `--top-k 3`. Change the retrieval author with
    `--author "Swami Adidevananda"`; available English translation authors are
    validated against the local corpus. The default server URL is
-   `http://127.0.0.1:8000`; override it with `--oio-url`.
+   `http://127.0.0.1:8000`; override it with `--knot-url`.
 
 The retriever and request-shape tests use Python's standard library:
 
@@ -58,7 +58,7 @@ python3 -m unittest -v test_gita_decision_demo.py
 
 ## Retrieval evaluation
 
-Run the small, hand-authored retrieval set without calling OIO:
+Run the small, hand-authored retrieval set without calling KNOT:
 
 ```bash
 python3 scripts/evaluate_gita_retrieval.py \
@@ -78,7 +78,7 @@ generic-word-overlap challenges (for example, finance, weather, and software
 queries) as well as queries with little expected lexical overlap. Its JSON
 report includes answerable citation Recall@k, answerable case Recall@k, MRR@k,
 and the rate at which unanswerable queries produce no positive lexical match.
-It reports retrieval only; these numbers do not measure OIO's decision
+It reports retrieval only; these numbers do not measure KNOT's decision
 quality. This remains a small hand-authored diagnostic set, not a representative
 or independently validated benchmark. A nonzero lexical hit for an
 unanswerable question is a retrieval false positive, not evidence that the
@@ -165,7 +165,7 @@ unanswerable no-evidence rate is zero. Sweep cutoffs on this diagnostic set to
 inspect the recall/abstention tradeoff, but do not treat a threshold tuned on
 these cases as production-calibrated.
 
-Retrieval results should be compared before evaluating OIO decisions. The
+Retrieval results should be compared before evaluating KNOT decisions. The
 hand-authored set is a small diagnostic, not a representative or independently
 validated benchmark.
 
@@ -267,10 +267,10 @@ As a retrieval-side experiment, the same English eval sets were run through
 [nqlite](https://github.com/devstroop/nqlite) hybrid retrieval instead of the
 hand-rolled Python indexes. A single long-lived `nql-server --stdio`
 subprocess ingested the 701 Sivananda verses (citation, author, text) with
-locally computed MiniLM-384 embeddings — the same model as the oio semantic
+locally computed MiniLM-384 embeddings — the same model as the knot semantic
 baseline, since nqlite vectors are bring-your-own by design — then answered a
 hybrid query per case (`::bm25` + `vector::similarity`, RRF k=60) at k=5.
-Answerable metrics reuse oio's `evaluate_retrieval` through a small index
+Answerable metrics reuse knot's `evaluate_retrieval` through a small index
 shim, so the numbers are directly comparable. nqlite ranks every candidate
 and always returns its top-k rows (fused RRF scores are never zero), so
 unanswerable abstention was measured separately with a BM25-positive
@@ -290,13 +290,13 @@ sets were validated against.
 
 | Config | Dev cite / case / MRR / no-ev | Holdout cite / case / MRR / no-ev |
 |---|---:|---:|
-| oio BM25 default | 1.000 / 1.000 / 0.917 / 0.417 | 0.938 / 1.000 / 0.861 / 0.333 |
-| oio hybrid + cutoff | 1.000 / 1.000 / 0.917 / 0.500 | 0.938 / 1.000 / 0.958 / 0.667 |
-| oio MiniLM + cutoff | 0.750 / 0.917 / 0.757 / 1.000 | 0.750 / 0.917 / 0.778 / 1.000 |
+| knot BM25 default | 1.000 / 1.000 / 0.917 / 0.417 | 0.938 / 1.000 / 0.861 / 0.333 |
+| knot hybrid + cutoff | 1.000 / 1.000 / 0.917 / 0.500 | 0.938 / 1.000 / 0.958 / 0.667 |
+| knot MiniLM + cutoff | 0.750 / 0.917 / 0.757 / 1.000 | 0.750 / 0.917 / 0.778 / 1.000 |
 | nqlite hybrid | 0.900 / 1.000 / 0.875 / 0.000 | 1.000 / 1.000 / 0.917 / 0.000 |
 
 nqlite's answerable ranking is competitive: on the frozen holdout it beats
-oio BM25 on citation recall (1.000 vs 0.938) and MRR (0.917 vs 0.861); on the
+knot BM25 on citation recall (1.000 vs 0.938) and MRR (0.917 vs 0.861); on the
 dev set it trails slightly (0.900 vs 1.000) on two partial citation misses —
 BG 6.16 ranked below top-5 for the moderation question, and BG 6.9 for the
 friend-and-foe question — while case recall stayed 1.000 in both sets. The gap
@@ -310,24 +310,24 @@ exclusion does.
 This is a comparison, not a migration: the default demo, eval sets, and
 thresholds are unchanged, and these small-set numbers do not establish that
 either retriever generalizes. The interesting follow-up is a demo that keeps
-oio's abstention rule on top of nqlite recall.
+knot's abstention rule on top of nqlite recall.
 
 ## nqlite-backed decision demo
 
 `scripts/gita_nqlite_demo.py` is that follow-up: the same typed-decision
 contract as `gita_decision_demo.py` (`choice`/`score`/`noul` over retrieved
-excerpts with citations, same OIO request shapes via the shared builders),
+excerpts with citations, same KNOT request shapes via the shared builders),
 but retrieval comes from nqlite hybrid queries instead of the hand-rolled
 indexes. Ranking uses the full query text, exactly as the spike measured;
 abstention uses a companion BM25 query over the query's content terms only
-(English stopwords stripped, unstemmed), which reproduces oio's own
+(English stopwords stripped, unstemmed), which reproduces knot's own
 stopword-aware no-evidence semantics — measured at 0.417 dev / 0.333
-holdout abstention, identical to oio BM25's 0.417 / 0.333. A query with no
+holdout abstention, identical to knot BM25's 0.417 / 0.333. A query with no
 content terms abstains without starting the server. Retrieval plumbing
 (server ownership, ingest, row parsing) is shared with the spike script.
 
 ```bash
-OIO_MODEL_DIR=/path/to/laya-english cargo run -p oio-serve  # port 8000
+KNOT_MODEL_DIR=/path/to/laya-english cargo run -p knot-serve  # port 8000
 python3 scripts/gita_nqlite_demo.py \
   "How should someone act without becoming attached to the result?" \
   --gita-repo ../gita \
@@ -345,9 +345,9 @@ validation).
 
 Smoke observation with the existing English checkpoint (`55cf4c4...`):
 nqlite retrieved BG 3.5/3.19/3.25/3.26/18.23 for the attachment question and
-OIO chose BG 3.5 at confidence ~0.25; score mode returned 2.63 ("relevant
+KNOT chose BG 3.5 at confidence ~0.25; score mode returned 2.63 ("relevant
 support but gaps"); noul returned true at 0.749; and a Bitcoin-price query
-abstained with BM25 max score 0.0 and no OIO call. As with the BM25 demo, the
+abstained with BM25 max score 0.0 and no KNOT call. As with the BM25 demo, the
 checkpoint is not a qualified Gita reranker — confidences are low and the
 ranking comes from the retriever. The live demo path needs the FastEmbed
 environment (`scripts/requirements-gita-semantic.txt`); the unit tests do not.
@@ -413,12 +413,12 @@ remains English-only.
 
 ## Scope and limitations
 
-This is a prototype for measuring the value of a domain corpus with OIO, not a
+This is a prototype for measuring the value of a domain corpus with KNOT, not a
 claim that the model has learned the Gita. BM25 is lexical, not semantic, and
 the existing decision checkpoint may choose or score passages poorly. Inspect
 retrieved passages and citations alongside each answer. For a quality
 evaluation, create a separately reviewed question set, include unanswerable
-questions, and report retrieval recall separately from OIO decision quality.
+questions, and report retrieval recall separately from KNOT decision quality.
 
 The live demo uses English translation text only; Hindi is supported by the
 retrieval evaluation (`--language hindi`) described above. The source clone is
@@ -432,7 +432,7 @@ guidance and does not replace interpreting the source in context.
 
 With the existing English checkpoint (`55cf4c4...`), the query
 "How should someone act without attachment to results?" retrieved BG 3.25 and
-BG 2.47 as its two highest BM25 passages. OIO selected BG 18.23 from the
+BG 2.47 as its two highest BM25 passages. KNOT selected BG 18.23 from the
 five-candidate list, with answer confidence about 0.22. The confidence is low
 and its choice did not match the lexical rank-1 passage. This is useful evidence
 that the integration works, but also that the current general checkpoint is

@@ -1,9 +1,9 @@
-# oio — Jev/Laya Compatibility
+# knot — Jev/Laya Compatibility
 
 ## Position
 
 - Laya is wire-compatible with TypeSafe's hosted Jev `/v1/systemone`.
-- oio targets the same wire, so a Jev or Laya client repoints its base URL at `oio-serve`.
+- knot targets the same wire, so a Jev or Laya client repoints its base URL at `knot`.
 
 ## What stays identical
 
@@ -15,7 +15,7 @@
 
 ## Response wire shape
 
-oio serializes responses the way Starlette does for Laya: compact separators
+knot serializes responses the way Starlette does for Laya: compact separators
 (`{"k":v}`), raw UTF-8 (`ensure_ascii=False`), keys in Laya's insertion order
 (workspace `serde_json` runs with `preserve_order`):
 
@@ -66,7 +66,7 @@ compact. Scalar reprs follow Python: `True`/`False`, `1.0`, `1e-05`.
 
 ## Deliberate differences from Jev
 
-| Area | Jev | Laya | oio |
+| Area | Jev | Laya | knot |
 |---|---|---|---|
 | Options per question | cap 255 | shared `head_max_len` budget (192/256), trim, then 422; HTTP guard ≤100 (413) | same as Laya |
 | `score` levels | null allowed, echoed in `legend` | description required, null → 422 | same as Laya |
@@ -81,24 +81,24 @@ compact. Scalar reprs follow Python: `True`/`False`, `1.0`, `1e-05`.
 The only captured hosted-Jev traffic (`jev-1.13.0`, 192 recorded answers,
 `laya/research/benchmarks/feishu_zh/results/v1/jev/raw.jsonl`) confirms the
 table above and adds the response-level divergences. A Jev response and a
-Laya/oio response are **different JSON** even to the same request:
+Laya/knot response are **different JSON** even to the same request:
 
 - Jev sends `model, answers, usage` only — no `routing`, no
   `answer_confidence`, no `action`.
 - Jev's answer key order is `type, choice, confidence, probabilities`
-  (noul: just `type, noul`); Laya/oio use Laya's order with the extra fields.
-- Jev rounds every probability to 2 decimals (768/768 recorded); Laya/oio to
+  (noul: just `type, noul`); Laya/knot use Laya's order with the extra fields.
+- Jev rounds every probability to 2 decimals (768/768 recorded); Laya/knot to
   4 (768/768).
 - Jev's `confidence` is `round2((n·p_max − 1)/(n − 1))` — re-verified against
-  the recordings (p_max 0.53 → 0.37, 0.85 → 0.80) — while Laya/oio use
+  the recordings (p_max 0.53 → 0.37, 0.85 → 0.80) — while Laya/knot use
   1 − normalized entropy and gate on `answer_confidence`.
 - Jev's `usage.output_tokens` counts generated tokens (46–68 recorded);
-  Laya/oio always send 0.
+  Laya/knot always send 0.
 - Jev's `probabilities` key order varies per response (24 distinct orders in
-  192 answers despite a fixed request criteria order); Laya/oio always echo
+  192 answers despite a fixed request criteria order); Laya/knot always echo
   criteria order.
 
-oio follows Laya in every row. Full evidence, serve-surface deltas and the
+knot follows Laya in every row. Full evidence, serve-surface deltas and the
 quality/latency numbers: `docs/RESEARCH-COMPARE.md`.
 
 ## HTTP surface parity (vs `laya-serve`)
@@ -106,13 +106,13 @@ quality/latency numbers: `docs/RESEARCH-COMPARE.md`.
 - `GET /health`: liveness `{"status":"ok"}` is always open; the bearer (or
   no configured key) unlocks Laya's detail payload — `loaded`, `revisions`,
   `device`, `device_is_preference`, `checkpoint_devices`, `cpu_fallbacks`,
-  in that order (`docs/http-api.md`). oio's values: `revisions` is the HF
+  in that order (`docs/http-api.md`). knot's values: `revisions` is the HF
   snapshot etag the checkpoint was downloaded at (e.g. Laya's reviewed
   `55cf4c4e…` for `convaiinnovations/laya`) or `null` for a hand-copied
   directory — the same `null` Laya reports for a local path;
-  `checkpoint_devices` is the configured `OIO_DEVICE` per resident name
+  `checkpoint_devices` is the configured `KNOT_DEVICE` per resident name
   (`"cpu"` by default, `"cuda"` with a `cuda`-feature build — SPEC §10)
-  and `cpu_fallbacks` is `{"count":0,"last_reason":null}`: oio never falls
+  and `cpu_fallbacks` is `{"count":0,"last_reason":null}`: knot never falls
   back silently — a device that cannot come up is a startup error.
 - Predict responses carry both timing headers Laya sends: `Server-Timing:
   inference;dur=<ms>` and `X-Inference-Time-Ms: <ms>`.
@@ -126,14 +126,14 @@ quality/latency numbers: `docs/RESEARCH-COMPARE.md`.
   only when `1 < batch_size < n`, results written back to input positions.
   The MCP batch tool validates the same arguments with Laya's merged MCP
   wording (`"batch_size must be a positive integer, got {v!r}"`).
-- `GET /models` is **oio's extension** — laya-serve has no such route
+- `GET /models` is **knot's extension** — laya-serve has no such route
   (`docs/http-api.md` lists only `/health`, `/v1/systemone`,
   `/v1/systemone/batch`). Clients written against Jev/Laya never call it;
   it exists for local introspection.
 
 ## Porting checklist for an existing client
 
-1. Repoint base URL to `oio-serve`.
+1. Repoint base URL to `knot`.
 2. Replace any `confidence` threshold with `answer_confidence`; re-fit cutoffs
    at the option counts you use.
 3. Cap choice options at 100 per question; narrow larger label sets with

@@ -33,22 +33,22 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       # Parity suites (engine/longdoc/onnx_parity/candle_parity) skip
-      # themselves without OIO_MODEL_DIR, so this is green without a
-      # checkpoint; set OIO_MODEL_DIR (a converted Laya export) to run them.
+      # themselves without KNOT_MODEL_DIR, so this is green without a
+      # checkpoint; set KNOT_MODEL_DIR (a converted Laya export) to run them.
       - name: cargo test
         run: cargo test --workspace
 
   # Full parity suites on Apple Silicon — the numeric half of the PRD N1
   # platform claim: the same checkpoint pipeline as gpu.yml (HF fetch at
   # the pinned revision + local ONNX export), cached per OS, then the
-  # whole workspace under OIO_MODEL_DIR. Free on this public repo; warm
+  # whole workspace under KNOT_MODEL_DIR. Free on this public repo; warm
   # runs are cache restore + tests only.
   parity-macos:
     runs-on: macos-latest
     timeout-minutes: 45
     env:
       HF_REVISION: 55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851
-      OIO_MODEL_DIR: ${{ github.workspace }}/.ckpt/laya-english
+      KNOT_MODEL_DIR: ${{ github.workspace }}/.ckpt/laya-english
     steps:
       - uses: actions/checkout@v7
 
@@ -84,23 +84,23 @@ jobs:
                   "*.json", "*.py", "model.safetensors",
                   "tokenizer/*", "encoder/*",
               ],
-              local_dir=os.environ["OIO_MODEL_DIR"],
+              local_dir=os.environ["KNOT_MODEL_DIR"],
           )
           print("checkpoint:", snap)
           PY
 
       - name: Export ONNX (the hub ships torch only)
         run: |
-          if [ ! -f "$OIO_MODEL_DIR/laya.onnx" ]; then
+          if [ ! -f "$KNOT_MODEL_DIR/laya.onnx" ]; then
             HF_HUB_OFFLINE=1 python3 - <<'PY'
           import os, sys
           sys.path.insert(0, os.path.join(os.environ["GITHUB_WORKSPACE"], "laya"))
           from scripts.export_onnx import export_to_onnx
-          d = os.environ["OIO_MODEL_DIR"]
+          d = os.environ["KNOT_MODEL_DIR"]
           export_to_onnx(d, os.path.join(d, "laya.onnx"))
           PY
           fi
-          ls -la "$OIO_MODEL_DIR"
+          ls -la "$KNOT_MODEL_DIR"
 
       - uses: dtolnay/rust-toolchain@stable
 

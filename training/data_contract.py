@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared validation for the optional OIO training-data pipeline."""
+"""Shared validation for the optional KNOT training-data pipeline."""
 
 import hashlib
 import json

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate a local OIO checkpoint on one prepared split and write a JSON report.
+"""Evaluate a local KNOT checkpoint on one prepared split and write a JSON report.
 
 Used to record the unchanged base-checkpoint baseline and, after a training
 recipe is frozen, to evaluate the experimental weights against the same split.

@@ -154,15 +154,15 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-MODEL_DIR = os.environ.get("OIO_TEST_MODEL_DIR")
-LAYA_SOURCE = os.environ.get("OIO_TEST_LAYA_SOURCE")
+MODEL_DIR = os.environ.get("KNOT_TEST_MODEL_DIR")
+LAYA_SOURCE = os.environ.get("KNOT_TEST_LAYA_SOURCE")
 DATA_FILE = Path(__file__).resolve().parents[1] / "out" / "data" / "validation.jsonl"
 
 
 @unittest.skipUnless(
     np is not None and TORCH_AVAILABLE and MODEL_DIR and LAYA_SOURCE and DATA_FILE.is_file(),
-    "install training/requirements.txt and set OIO_TEST_MODEL_DIR, "
-    "OIO_TEST_LAYA_SOURCE with prepared data to run cache parity tests",
+    "install training/requirements.txt and set KNOT_TEST_MODEL_DIR, "
+    "KNOT_TEST_LAYA_SOURCE with prepared data to run cache parity tests",
 )
 class CachedForwardParityTests(unittest.TestCase):
     def test_cached_features_match_the_live_forward_pass(self):

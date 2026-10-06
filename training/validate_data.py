@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a prepared OIO corpus and its provenance/split manifest."""
+"""Validate a prepared KNOT corpus and its provenance/split manifest."""
 
 import argparse
 import sys

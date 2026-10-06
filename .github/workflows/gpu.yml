@@ -15,7 +15,7 @@ name: GPU
 #      Ubuntu, image "GPU-optimized" (partner image), size under the
 #      "GPU-powered" tab (e.g. NVIDIA T4, 16 GB). Larger runners get a
 #      default label equal to their name — name the runner `gpu-t4`.
-#   3. Grant the `devstroop/oio` repository access to that runner
+#   3. Grant the `devstroop/knot` repository access to that runner
 #      (runner group → repositories).
 #   4. Repository → Settings → Secrets and variables → Actions →
 #      Variables → add `GPU_RUNNER` = the runner label (`gpu-t4`).
@@ -63,7 +63,7 @@ jobs:
     runs-on: ${{ vars.GPU_RUNNER }}
     timeout-minutes: 90
     env:
-      OIO_MODEL_DIR: ${{ github.workspace }}/.ckpt/laya-english
+      KNOT_MODEL_DIR: ${{ github.workspace }}/.ckpt/laya-english
     steps:
       - uses: actions/checkout@v7
 
@@ -108,23 +108,23 @@ jobs:
                   "*.json", "*.py", "model.safetensors",
                   "tokenizer/*", "encoder/*",
               ],
-              local_dir=os.environ["OIO_MODEL_DIR"],
+              local_dir=os.environ["KNOT_MODEL_DIR"],
           )
           print("checkpoint:", snap)
           PY
 
       - name: Export ONNX (the hub ships torch only)
         run: |
-          if [ ! -f "$OIO_MODEL_DIR/laya.onnx" ]; then
+          if [ ! -f "$KNOT_MODEL_DIR/laya.onnx" ]; then
             HF_HUB_OFFLINE=1 python3 - <<'PY'
           import os, sys
           sys.path.insert(0, os.path.join(os.environ["GITHUB_WORKSPACE"], "laya"))
           from scripts.export_onnx import export_to_onnx
-          d = os.environ["OIO_MODEL_DIR"]
+          d = os.environ["KNOT_MODEL_DIR"]
           export_to_onnx(d, os.path.join(d, "laya.onnx"))
           PY
           fi
-          ls -la "$OIO_MODEL_DIR"
+          ls -la "$KNOT_MODEL_DIR"
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -137,8 +137,8 @@ jobs:
 
       - name: serve reports the real device on /health
         run: |
-          cargo build -p oio-serve --features cuda
-          OIO_DEVICE=cuda OIO_PORT=8080 target/debug/oio-serve &
+          cargo build -p knot-serve --features cuda
+          KNOT_DEVICE=cuda KNOT_PORT=8080 target/debug/knot &
           pid=$!
           for _ in $(seq 1 60); do
             curl -sf localhost:8080/health >/dev/null && break
@@ -157,12 +157,12 @@ jobs:
 
       - name: device latency bench (release, CUDA then CPU)
         env:
-          OIO_DEVICE: cuda
+          KNOT_DEVICE: cuda
         run: |
           {
             echo "### device latency (p50/p95/mean per predict)"
             echo '```'
             cargo test --release --features cuda --test gpu_bench -- --ignored --nocapture 2>&1 | grep '^device='
-            OIO_DEVICE=cpu cargo test --release --features cuda --test gpu_bench -- --ignored --nocapture 2>&1 | grep '^device='
+            KNOT_DEVICE=cpu cargo test --release --features cuda --test gpu_bench -- --ignored --nocapture 2>&1 | grep '^device='
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
