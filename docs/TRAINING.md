@@ -104,7 +104,10 @@ calibration has not been refit and final-test evaluation is not part of this
 smoke command. Never replace a release checkpoint with this output.
 
 The run manifest records the selected source IDs, seeds, split hashes, base
-checkpoint path, and trainable parameter count. A later quality experiment
+checkpoint path, and trainable parameter count. Step loss is printed during
+training, and each epoch's weights are saved (`experimental-model-epochN`)
+with a validation evaluation recorded in the manifest, so the epoch used for
+any later test comparison is a validation choice, never a test choice. A later quality experiment
 must separately define and freeze model-selection, calibration, and test
 protocols; compare against the unchanged base checkpoint; report per-primitive
 metrics and confidence calibration; and pass both ONNX and Candle parity gates
