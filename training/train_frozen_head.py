@@ -6,6 +6,7 @@ import json
 import random
 import subprocess
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -19,6 +20,7 @@ if __package__ in (None, ""):
         sha256_file,
         validate_directory,
     )
+    from training.eval_metrics import collate, evaluate_model, summarize
 else:
     from .data_contract import (
         DataError,
@@ -28,6 +30,7 @@ else:
         sha256_file,
         validate_directory,
     )
+    from .eval_metrics import collate, evaluate_model, summarize
 
 PINNED_LAYA_REVISION = "4aa6761be8173de4ce6d92c31b3e40b6eaf59a7c"
 PINNED_BASE_REVISION = "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851"
@@ -120,63 +123,18 @@ def load_model(model_dir, laya_source):
             "qtype": QTYPES[primitive],
             "target_index": target_index,
             "primitive": primitive,
+            "source": row["source"]["dataset_id"],
             "case_id": row["case_id"],
         }
 
     return torch, model, tokenizer, cfg, encode
 
 
-def collate(batch, pad_id, torch):
-    batch_size = len(batch)
-    seq_len = max(len(item["ids"]) for item in batch)
-    option_count = max(len(item["markers"]) for item in batch)
-    input_ids = torch.full((batch_size, seq_len), pad_id, dtype=torch.long)
-    attention = torch.zeros((batch_size, seq_len), dtype=torch.long)
-    marker_pos = torch.zeros((batch_size, option_count), dtype=torch.long)
-    marker_mask = torch.zeros((batch_size, option_count), dtype=torch.bool)
-    labels = torch.zeros(batch_size, dtype=torch.long)
-    qtypes = torch.zeros(batch_size, dtype=torch.long)
-    for index, item in enumerate(batch):
-        length = len(item["ids"])
-        input_ids[index, :length] = torch.tensor(item["ids"], dtype=torch.long)
-        attention[index, :length] = 1
-        count = len(item["markers"])
-        marker_pos[index, :count] = torch.tensor(item["markers"], dtype=torch.long)
-        marker_mask[index, :count] = True
-        labels[index] = item["target_index"]
-        qtypes[index] = item["qtype"]
-    return input_ids, attention, marker_pos, marker_mask, labels, qtypes
-
-
-def evaluate(model, items, tokenizer, batch_size, torch):
-    results = {primitive: {"correct": 0, "count": 0, "score_abs_error": 0.0}
-               for primitive in PRIMITIVES}
-    model.eval()
-    with torch.no_grad():
-        for start in range(0, len(items), batch_size):
-            chunk = items[start:start + batch_size]
-            ids, attention, positions, mask, labels, qtypes = collate(
-                chunk, tokenizer.pad_token_id, torch
-            )
-            logits, _ = model(ids, attention, positions, mask, qtypes)
-            predictions = logits.masked_fill(~mask, -1e4).argmax(-1).tolist()
-            for item, prediction in zip(chunk, predictions):
-                metric = results[item["primitive"]]
-                metric["count"] += 1
-                metric["correct"] += int(prediction == item["target_index"])
-                if item["primitive"] == "score":
-                    metric["score_abs_error"] += abs(prediction - item["target_index"])
-    model.train()
-    model.encoder.eval()
-    for primitive, metric in results.items():
-        count = metric["count"]
-        if count:
-            metric["accuracy"] = metric["correct"] / count
-            if primitive == "score":
-                metric["score_mae"] = metric["score_abs_error"] / count
-            metric.pop("correct")
-            metric.pop("score_abs_error")
-    return results
+def evaluate(model, items, tokenizer, batch_size, torch, progress_every=None):
+    """Return aggregated held-out metrics for the encoded items."""
+    return summarize(evaluate_model(
+        model, items, tokenizer, batch_size, torch, progress_every=progress_every
+    ))
 
 
 def source_revision(path):
@@ -198,6 +156,7 @@ def source_revision(path):
 
 
 def main():
+    started = time.monotonic()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", required=True)
     parser.add_argument("--model-dir", required=True, help="Local checkpoint; no network access is used")
@@ -275,7 +234,7 @@ def main():
             optimizer.step()
 
     validation_metrics = evaluate(
-        model, validation_items, tokenizer, args.batch_size, torch
+        model, validation_items, tokenizer, args.batch_size, torch, progress_every=1000
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     weights_path = output_dir / "experimental-model.safetensors"
@@ -307,6 +266,7 @@ def main():
         "safetensors_version": safetensors.__version__,
         "encoder_frozen": True,
         "trainable_parameter_count": trainable_count,
+        "wall_clock_seconds": round(time.monotonic() - started, 3),
         "train_case_ids": [item["case_id"] for item in train_items],
         "validation_case_ids": [item["case_id"] for item in validation_items],
         "validation_metrics_smoke_only": validation_metrics,
