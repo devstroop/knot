@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/devstroop/knot/actions/workflows/ci.yml/badge.svg)](https://github.com/devstroop/knot/actions/workflows/ci.yml)
 
-Production-oriented Rust decision engine — a self-hosted, open alternative to
+A self-hosted, open alternative to
 TypeSafe's hosted Jev API, compatible with Laya's `/v1/systemone` wire protocol.
 
 Non-autoregressive "System 1" decisions over typed questions (`choice` / `score` / `noul`)
