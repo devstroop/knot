@@ -13,6 +13,11 @@ level per working round.
 | [RESEARCH-COMPARE.md](RESEARCH-COMPARE.md) | Evidence: recorded Jev vs Laya vs knot wire, serve deltas, quality/latency numbers, scope ranking | New research evidence lands or gaps move |
 | [DEMO.md](DEMO.md) | Generated three-way run report: Jev recorded/published vs Laya vs knot over the English/feishu/Hindi corpora | `scripts/demo.sh` re-runs (raw evidence in `demo/results.json`) |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Crate layout, one `predict()` data flow, `Runtime` trait | Crates/layers reorganize |
+| [BRAND.md](BRAND.md) | Brand map: OIO parent, knot engine, nqlite memory; naming history | The family or the names change |
+| [MIGRATION.md](MIGRATION.md) | Upgrading from `oio`: env/binary/MCP/cache mapping | Anything user-facing is renamed again |
+| [BENCHMARKING.md](BENCHMARKING.md) | Paired ONNX/Candle method, measured numbers with bindings | Method changes or numbers are re-measured |
+| [TRAINING.md](TRAINING.md) | Staged pipeline, data policy, predeclared gates, recorded verdict | Pipeline, data, or gates change |
+| [GITA-DEMO.md](GITA-DEMO.md) | Retrieval + decision demos, eval sets, nqlite comparison | Demo, sets, or retrievers change |
 | [ADR/](ADR/) | Why decisions were made (append-only) | New decision taken |
 
 Rules:
