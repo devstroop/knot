@@ -110,12 +110,121 @@ protocols; compare against the unchanged base checkpoint; report per-primitive
 metrics and confidence calibration; and pass both ONNX and Candle parity gates
 from the same canonical weights before any deployment consideration.
 
+## Stage-one quality gates (predeclared)
+
+The smoke run above proves the plumbing. The first quality experiment has to
+prove a held-out gain against the unchanged base checkpoint. These gates are
+declared before any full-corpus training run. Changing a threshold after
+seeing test numbers invalidates the experiment; thresholds change only through
+an explicit revision of this document that says so.
+
+### Protocol
+
+1. **Baseline first.** Evaluate the unchanged base checkpoint on the prepared
+   `validation` split with `training/evaluate_checkpoint.py` and keep the JSON
+   report. Every later comparison is made against that number, produced by the
+   same evaluator on the same split.
+2. **Select on validation only.** Epochs, learning rate, and checkpoint choice
+   come from `validation` metrics. The `calibration` split is reserved for
+   fitting confidence calibration after the recipe is frozen. The `test` split
+   is evaluated exactly twice — base and trained — and only after the recipe,
+   seed, and epoch count are frozen.
+3. **Report per primitive and per source.** Aggregate accuracy can hide a
+   regression in MASSIVE or BANKING77, so both slices are reported next to the
+   overall numbers.
+4. **Calibration is measured, not assumed.** Brier score and 10-bin expected
+   calibration error come from the evaluator; any calibration refit on the
+   `calibration` split is recorded separately and never fit on test.
+
+### Gates
+
+A stage-one run counts as a held-out gain only if all of these hold on the
+`test` split, base versus trained, from the same evaluator:
+
+| Gate | Requirement |
+|---|---|
+| G1 `choice` | trained choice accuracy ≥ base choice accuracy + 0.01 absolute |
+| G2 no source regression | neither MASSIVE nor BANKING77 choice accuracy falls more than 0.005 below its base value |
+| G3 `noul` | trained noul Brier ≤ base Brier and trained noul ECE ≤ base ECE. Both may stay poor: the labels are derived, so this gate only forbids worsening |
+| G4 `score` | reported for completeness, excluded from pass/fail — the labels are OIO-authored synthetic |
+| G5 protocol | test evaluated only after freezing; calibration fit only on `calibration`; both reports carry the split and weights hashes |
+| G6 deployment | out of scope for stage one: deployability still requires ONNX and Candle parity from the same canonical weights |
+
+If a gate fails, the experiment failed. Do not retune the thresholds to match
+the result; change the recipe — data volume, epochs, learning rate, what is
+unfrozen — and rerun.
+
+### Measuring a checkpoint
+
+```bash
+python -m training.evaluate_checkpoint \
+  --data-dir training/out/data \
+  --model-dir /path/to/pinned/laya-checkpoint \
+  --laya-source /path/to/laya \
+  --split validation \
+  --batch-size 16 --threads 16 \
+  --output training/out/baseline-validation.json
+```
+
+Pass `--weights path/to/experimental-model.safetensors` to evaluate trained
+weights on top of the same base checkpoint. The report records the evaluated
+weights SHA-256, base weights SHA-256, data-manifest hash, Laya revision, batch
+size, thread count, wall-clock seconds, and metrics: overall accuracy, then per
+primitive count/accuracy/mean confidence/Brier/10-bin ECE (plus MAE for
+`score`) and per-source accuracy. `--split test` reports carry a protocol note
+reminding the caller of rule 2 above.
+
+`--max-cases N` runs a fast smoke check; those reports are marked
+`smoke_limited` and must never be quoted as results.
+
+### Recorded baseline (validation)
+
+Produced from the unchanged pinned base checkpoint before any training run:
+weights `891102d372688fc2…`, data manifest `5add84afe7ff7932…`, batch 16, 16
+threads, 3,097 s wall for all 7,087 cases.
+
+| Slice | Cases | Accuracy | Mean confidence | Brier | ECE |
+|---|---:|---:|---:|---:|---:|
+| `choice`, all | 3,030 | 0.425 | 0.549 | 0.779 | 0.159 |
+| `choice`, MASSIVE | 2,028 | 0.453 | | | |
+| `choice`, BANKING77 | 1,002 | 0.369 | | | |
+| `noul`, derived | 4,056 | 0.689 | 0.937 | 0.544 | 0.247 |
+| `score`, synthetic | 1 | n=1, not meaningful | | | |
+| overall | 7,087 | 0.576 | | | |
+
+What this fixes for later comparisons:
+
+- The base checkpoint reaches 0.425/0.369 choice accuracy on the two intent
+  sources, so G1 and G2 have measurable headroom. These — not published
+  dataset numbers — are what trained runs are compared against.
+- The `score` slice has exactly one validation case: the synthetic corpus is
+  far too small to say anything about score quality, which is why G4 keeps
+  score out of pass/fail and why real score supervision stays the blocker
+  rather than a score threshold.
+- `noul` shows 0.94 mean confidence against 0.69 accuracy (ECE 0.247): the
+  base checkpoint is already overconfident on derived binary labels, so G3
+  forbidding any worsening is a real constraint, not a formality.
+- Forward-only throughput was 2.3 rows/s (7,087 rows in 3,097 s). Training
+  adds backward passes, so a full 38,988-row epoch is on the order of ten or
+  more CPU-hours on this class of host — see the cost note below.
+
+The full JSON report — per-source slices, weights and data hashes, wall clock
+— lives in the ignored `training/out/baseline-validation.json`. Reproduce it
+with the command above; do not edit these numbers by hand.
+
+Note on cost: the encoder is frozen but still evaluated on every training
+step, so a full-corpus CPU epoch is measured in hours. Record the selected data
+volume and wall-clock time in the run manifest so runs stay comparable, and
+treat a subset run as a declared subset — never report it as a full-corpus
+result.
+
 ## Future stages
 
 1. **Data and smoke pipeline:** licensed adapters, provenance/split validation,
    and this frozen-head CPU run.
-2. **Quality experiment:** obtain approved real score supervision and define
-   data volume, validation/calibration policy, held-out metrics, and baselines.
+2. **Quality experiment:** execute the gates above — baseline, frozen recipe,
+   held-out test — and obtain approved real `score` supervision, which still
+   blocks any score-quality claim.
 3. **Canonical artifact:** version the training checkpoint and derive both
    ONNX and Candle-compatible artifacts from the same weights; retain
    `OIO_RUNTIME=onnx|candle`.
