@@ -51,7 +51,12 @@ def load_cases(path):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gita-repo", type=Path, default=DEFAULT_GITA_REPO)
-    parser.add_argument("--author", default="Swami Sivananda")
+    parser.add_argument("--language", choices=("english", "hindi"), default="english")
+    parser.add_argument(
+        "--author",
+        help="translation author (default: Swami Sivananda for English, "
+        "Swami Tejomayananda for Hindi)",
+    )
     parser.add_argument("--eval-set", type=Path, default=DEFAULT_EVAL_SET)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument(
@@ -97,7 +102,15 @@ def main(argv=None):
     if args.rrf_k < 1:
         parser.error("--rrf-k must be positive")
     try:
-        passages = load_passages(args.gita_repo, args.author)
+        author = args.author or (
+            "Swami Sivananda" if args.language == "english"
+            else "Swami Tejomayananda"
+        )
+        if args.language == "hindi" and args.retriever != "bm25":
+            parser.error(
+                "the current MiniLM model is English-only; Hindi evaluation supports BM25 only"
+            )
+        passages = load_passages(args.gita_repo, author, args.language)
         cases = load_cases(args.eval_set)
         bm25_index = BM25Index(passages)
         if args.retriever == "bm25":
@@ -121,6 +134,8 @@ def main(argv=None):
         )
         data_dir = args.gita_repo / "data"
         report["retriever"] = args.retriever
+        report["language"] = args.language
+        report["author"] = author
         if args.retriever in {"semantic", "hybrid"}:
             report["embedding_model"] = args.model
         if args.retriever == "hybrid":
@@ -129,7 +144,8 @@ def main(argv=None):
         report["corpus"] = {
             "repository": "https://github.com/itsalfredashu/gita",
             "revision": git_revision(args.gita_repo),
-            "translation_author": args.author,
+            "translation_author": author,
+            "language": args.language,
             "verse_json_sha256": sha256_file(data_dir / "verse.json"),
             "translation_json_sha256": sha256_file(data_dir / "translation.json"),
         }

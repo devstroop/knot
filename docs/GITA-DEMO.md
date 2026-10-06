@@ -261,6 +261,65 @@ to tune a production relevance threshold, and the filter is still lexical, not
 a semantic retriever. Reproduce the ablations with `--min-query-overlap 2`
 and `--min-query-overlap 3`, respectively.
 
+## Hindi holdout
+
+The authorized clone also carries Hindi translations, so the retrieval
+diagnostic was extended to a second language with
+`scripts/gita_retrieval_holdout_hi.jsonl`: 24 balanced cases (12 answerable,
+12 unanswerable) with original Hindi questions, disjoint case IDs and query
+strings from both English sets. Expected citations were validated against the
+local Swami Tejomayananda index (701 verses); no question text or verse text
+was copied from another dataset.
+
+```bash
+python3 scripts/evaluate_gita_retrieval.py \
+  --gita-repo ../gita \
+  --language hindi \
+  --eval-set scripts/gita_retrieval_holdout_hi.jsonl \
+  --top-k 5
+```
+
+The report records the language, author, and corpus hashes. The current
+holdout SHA-256 is
+`8771c21ae19fc7ba423090fd6f4ee8c622ece729ed91ead8d2ff04f74c6b9ac9`.
+
+Two implementation notes are load-bearing for these numbers:
+
+- Python's `\w` excludes combining marks, so the previous token pattern split
+  Devanagari words at every vowel sign and virama. Tokenization now keeps
+  word characters plus Devanagari/transliteration combining marks, and the
+  Hindi function-word list (postpositions, pronouns, auxiliaries, question
+  words) is treated as stop words. English tokenization is unchanged: all 701
+  English passages tokenize identically before and after this change, and the
+  English development and holdout metrics above are unaffected.
+- `sentence-transformers/all-MiniLM-L6-v2` is English-only, so
+  `--language hindi` accepts BM25 only; semantic and hybrid retrieval are
+  rejected with an error rather than silently producing meaningless
+  embeddings.
+
+Results at `k=5` with default BM25:
+
+| Configuration | Citation Recall@5 | Case Recall@5 | MRR@5 | Unanswerable no-evidence |
+|---|---:|---:|---:|---:|
+| BM25 default | 0.929 | 1.000 | 1.000 | 0.167 |
+| BM25, minimum 2 query-term overlaps | 0.929 | 1.000 | 1.000 | 0.667 |
+| BM25, minimum 3 query-term overlaps | 0.929 | 1.000 | 1.000 | 0.917 |
+
+Every answerable case had its first cited verse at rank 1; the single
+citation-level miss is BG 3.8, which ranks below `k=5` for the two-citation
+`hi-attachmentless-duty` case. Abstention is much weaker than on the English
+holdout (0.167 versus 0.333): ten of twelve unanswerable queries still
+retrieve passages from generic-word overlap, including the deliberate traps.
+This mirrors the English finding that a lexical match is not evidence of
+answerability, and it is a reason to keep Hindi abstention untrusted.
+
+These numbers are descriptive of a small, single-author, same-process
+diagnostic set. The Hindi stop-word list was finalized while inspecting
+false-positive matches on this set, so this holdout is not fully untouched for
+tokenization choices: treat it as a smoke diagnostic and author an independent,
+reviewed Hindi test set before making any Hindi quality claim. The live demo
+remains English-only.
+
 ## Scope and limitations
 
 This is a prototype for measuring the value of a domain corpus with OIO, not a
@@ -270,7 +329,8 @@ retrieved passages and citations alongside each answer. For a quality
 evaluation, create a separately reviewed question set, include unanswerable
 questions, and report retrieval recall separately from OIO decision quality.
 
-The current demo uses English translation text only. The source clone is
+The live demo uses English translation text only; Hindi is supported by the
+retrieval evaluation (`--language hindi`) described above. The source clone is
 treated as authorized for this prototype as requested; author attribution and
 source hashes are retained so provenance remains visible. Verify any
 per-translation or commentary rights before redistributing corpus text or
