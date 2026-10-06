@@ -183,6 +183,12 @@ def main():
         help="With --feature-cache, check cached logits against the live forward pass "
         "(default: 64, 0 disables)",
     )
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=200,
+        help="Print the training loss every N optimizer steps (0 disables)",
+    )
     args = parser.parse_args()
 
     if args.epochs < 1 or args.batch_size < 1 or args.max_train_per_label < 1:
@@ -196,6 +202,8 @@ def main():
         parser.error("--verify-cases must not be negative")
     if args.verify_cases is not None and not args.feature_cache:
         parser.error("--verify-cases requires --feature-cache")
+    if args.progress_every < 0:
+        parser.error("--progress-every must not be negative")
     if args.base_revision != PINNED_BASE_REVISION:
         parser.error("base-revision must match the pinned local checkpoint revision")
 
@@ -303,11 +311,19 @@ def main():
         raise RuntimeError("expected only non-encoder parameters to be trainable")
     optimizer = torch.optim.AdamW(trainable, lr=1e-4, weight_decay=0.01)
 
+    output_dir.mkdir(parents=True, exist_ok=True)
+    validation_forward = (
+        cached_forward_fn(model, feature_caches["validation"], torch)
+        if feature_caches["validation"] is not None
+        else None
+    )
+    epoch_checkpoints = []
+    total_steps = (len(train_items) + args.batch_size - 1) // args.batch_size
     for epoch in range(args.epochs):
         random.Random(args.seed + epoch).shuffle(train_items)
         model.train()
         model.encoder.eval()
-        for start in range(0, len(train_items), args.batch_size):
+        for step, start in enumerate(range(0, len(train_items), args.batch_size)):
             chunk = train_items[start:start + args.batch_size]
             ids, attention, positions, mask, labels, qtypes = collate(
                 chunk, tokenizer.pad_token_id, torch
@@ -324,20 +340,44 @@ def main():
             loss.backward()
             torch.nn.utils.clip_grad_norm_(trainable, 1.0)
             optimizer.step()
+            if args.progress_every and (step + 1) % args.progress_every == 0:
+                print(
+                    "epoch %d/%d step %d/%d loss %.4f"
+                    % (epoch + 1, args.epochs, step + 1, total_steps,
+                       float(loss.item())),
+                    flush=True,
+                )
+        epoch_weights_path = output_dir / ("experimental-model-epoch%d.safetensors" % (epoch + 1))
+        save_file(
+            {
+                name: value.detach().half().cpu().contiguous()
+                for name, value in model.state_dict().items()
+            },
+            str(epoch_weights_path),
+        )
+        epoch_metrics = evaluate(
+            model, validation_items, tokenizer, args.batch_size, torch,
+            progress_every=1000, forward_fn=validation_forward,
+        )
+        print(
+            "epoch %d/%d validation accuracy %.4f (%s)"
+            % (epoch + 1, args.epochs, epoch_metrics["accuracy"],
+               json.dumps({name: round(summary["accuracy"], 4)
+                           for name, summary in epoch_metrics["by_primitive"].items()},
+                          sort_keys=True)),
+            flush=True,
+        )
+        epoch_checkpoints.append({
+            "epoch": epoch + 1,
+            "weights": str(epoch_weights_path),
+            "weights_sha256": sha256_file(epoch_weights_path),
+            "validation_metrics": epoch_metrics,
+        })
 
-    validation_forward = (
-        cached_forward_fn(model, feature_caches["validation"], torch)
-        if feature_caches["validation"] is not None
-        else None
-    )
-    validation_metrics = evaluate(
-        model, validation_items, tokenizer, args.batch_size, torch,
-        progress_every=1000, forward_fn=validation_forward,
-    )
+    validation_metrics = epoch_checkpoints[-1]["validation_metrics"]
     for cache in feature_caches.values():
         if cache is not None:
             cache.close()
-    output_dir.mkdir(parents=True, exist_ok=True)
     weights_path = output_dir / "experimental-model.safetensors"
     save_file(
         {
@@ -379,6 +419,7 @@ def main():
         "train_case_ids": [item["case_id"] for item in train_items],
         "validation_case_ids": [item["case_id"] for item in validation_items],
         "validation_metrics_smoke_only": validation_metrics,
+        "epoch_checkpoints": epoch_checkpoints,
         "test_evaluated": False,
         "calibration_refit": False,
         "source_split_policy": source_manifest["split_policy"],
