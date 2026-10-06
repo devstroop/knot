@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-command demonstration: prep the environment, then run the three-way
-# comparison (Laya vs oio live, Jev recorded/published) and regenerate
+# comparison (Laya vs knot live, Jev recorded/published) and regenerate
 # docs/DEMO.md.
 #
 #   scripts/demo.sh              # full run
@@ -8,14 +8,14 @@
 #
 # Idempotent: every expensive step checks for its artifact first.
 # Environment: user-local only (uv-managed venv + interpreters, HuggingFace
-# cache, the oio-cache checkpoints). Nothing touches the system Python.
+# cache, the knot-cache checkpoints). Nothing touches the system Python.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UV="${UV:-$HOME/.local/bin/uv}"
 VENV="$ROOT/.venv-demo"
 LAYA="${DEMO_LAYA_CHECKOUT:-$ROOT/../laya}"
-OIO_CACHE="${DEMO_OIO_CACHE:-/home/devstroop/oio-cache}"
+KNOT_CACHE="${DEMO_KNOT_CACHE:-/home/devstroop/knot-cache}"
 HF_SNAP="${DEMO_HF_SNAP:-$HOME/.cache/huggingface/hub/models--convaiinnovations--laya/snapshots/55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851}"
 FIXTURE="$ROOT/demo/cases/massive_hi.json"
 
@@ -58,7 +58,7 @@ fi
 [ -f "$HF_SNAP/model.safetensors" ] || { echo "error: snapshot missing at $HF_SNAP" >&2; exit 1; }
 [ -f "$HF_SNAP/multilingual/model.safetensors" ] || { echo "error: multilingual missing at $HF_SNAP" >&2; exit 1; }
 
-step "multilingual ONNX export (oio consumes ONNX; the hub ships torch only)"
+step "multilingual ONNX export (knot consumes ONNX; the hub ships torch only)"
 if [ ! -f "$HF_SNAP/multilingual/laya.onnx" ]; then
     HF_HUB_OFFLINE=1 USE_TORCH=1 TOKENIZERS_PARALLELISM=false "$VENV/bin/python" - <<PY
 import sys
@@ -100,8 +100,8 @@ print(f"wrote {out}: {len(fixture['rows'])} rows, {len(labels)} labels")
 PY
 fi
 
-step "oio-serve (release)"
-(cd "$ROOT" && cargo build --release -p oio-serve)
+step "knot (release)"
+(cd "$ROOT" && cargo build --release -p knot-serve)
 
 step "run demo${*:+ ($*)}"
 mkdir -p "$ROOT/demo/logs"

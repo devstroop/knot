@@ -1,11 +1,11 @@
-# oio Architecture
+# knot Architecture
 
 ## Crates
 
 ```
-oio-workspace/oio/
+knot-workspace/knot/
 ├── crates/
-│   ├── oio/         # library
+│   ├── knot/         # library
 │   │   └── src/
 │   │       ├── lib.rs            # public API surface, feature gates
 │   │       ├── protocol.rs       # wire types (M0)
@@ -18,7 +18,7 @@ oio-workspace/oio/
 │   │       ├── shortlist.rs      # embedding shortlist + cache (M6)
 │   │       └── engine.rs         # predict/predict_long/predict_batch (M2.5+)
 │   │   └── tests/                # parity + behaviour suites
-│   └── oio-serve/   # binary + axum library
+│   └── knot/   # binary + axum library
 │       └── src/
 │           ├── main.rs           # env config, --mcp dispatch (M4/M7)
 │           ├── lib.rs            # HTTP app: /v1/systemone(/batch), /health, /models
@@ -29,7 +29,7 @@ oio-workspace/oio/
 ## One `predict()` data flow
 
 ```
-HTTP /v1/systemone (or MCP oio_predict)
+HTTP /v1/systemone (or MCP knot_predict)
   → validate: limits/refusals/controls (422/413)          [M4/M7]
   → router.route(state) → checkpoint id                    [M3]
   → checkpoint(name): LRU touch, (re)load if not resident  [M3/PRD F6]
@@ -63,21 +63,21 @@ pub trait Runtime {
 
 Impls: `OnnxRuntime` (feature `onnx`, `ort`, CPU) and `CandleRuntime`
 (feature `candle`, candle 0.11, CPU). `Engine::load` / `Engine::load_candle`
-pick the backend; `oio-serve` selects at runtime with `OIO_RUNTIME`.
+pick the backend; `knot` selects at runtime with `KNOT_RUNTIME`.
 
 ## Concurrency
 
 - Single shared tokenizer behind a lock (Laya's `_TOKENIZE_LOCK` semantics).
 - Server: semaphore-bounded concurrency, token-budget cap; the
   `x-inference-time-ms` header is measured after the gate is acquired.
-- Checkpoint residency: LRU bounded by `max_loaded` (default 2, `OIO_MAX_LOADED`).
+- Checkpoint residency: LRU bounded by `max_loaded` (default 2, `KNOT_MAX_LOADED`).
   Engine loads up to `max_loaded` eagerly, loads further models on first use,
   evicts on overflow; an in-flight prediction holds an `Arc` so it is never
   evicted out from under itself.
 
-## Config (`OIO_*`)
+## Config (`KNOT_*`)
 
-`OIO_MODELS=name=/path,...` or `OIO_MODEL_DIR`, `OIO_CACHE_DIR`,
-`OIO_DEFAULT_MODEL`, `OIO_MAX_LOADED`, `OIO_AUTO_TASK`, `OIO_API_KEY`,
-`OIO_MAX_CONCURRENT`, `OIO_MAX_TOKEN_BUDGET`, `OIO_HOST`, `OIO_PORT`,
-`OIO_RUNTIME=onnx|candle`, `OIO_DEVICE=cpu|cuda` (SPEC §10).
+`KNOT_MODELS=name=/path,...` or `KNOT_MODEL_DIR`, `KNOT_CACHE_DIR`,
+`KNOT_DEFAULT_MODEL`, `KNOT_MAX_LOADED`, `KNOT_AUTO_TASK`, `KNOT_API_KEY`,
+`KNOT_MAX_CONCURRENT`, `KNOT_MAX_TOKEN_BUDGET`, `KNOT_HOST`, `KNOT_PORT`,
+`KNOT_RUNTIME=onnx|candle`, `KNOT_DEVICE=cpu|cuda` (SPEC §10).

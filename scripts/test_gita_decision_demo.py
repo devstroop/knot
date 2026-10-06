@@ -332,7 +332,7 @@ class GitaDecisionDemoTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "no passage embeddings"):
                 SemanticIndex(self.passages)
 
-    def test_main_skips_oio_when_retrieval_has_no_evidence(self):
+    def test_main_skips_knot_when_retrieval_has_no_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
             data = repo / "data"
@@ -349,7 +349,7 @@ class GitaDecisionDemoTests(unittest.TestCase):
                 "description": "A teaching about action.",
             }]), encoding="utf-8")
             stdout = io.StringIO()
-            with patch("gita_decision_demo.call_oio") as call_oio:
+            with patch("gita_decision_demo.call_knot") as call_knot:
                 with contextlib.redirect_stdout(stdout):
                     status = main([
                         "postgresql transaction isolation",
@@ -360,7 +360,7 @@ class GitaDecisionDemoTests(unittest.TestCase):
             self.assertEqual(status, 0)
             self.assertTrue(payload["no_evidence"])
             self.assertIsNone(payload["decision"])
-            call_oio.assert_not_called()
+            call_knot.assert_not_called()
 
     def test_choice_payload_retains_citations_and_authorship(self):
         ranked = self.index.search("action mind", limit=2)
@@ -379,7 +379,7 @@ class GitaDecisionDemoTests(unittest.TestCase):
         self.assertEqual(request["questions"]["gita_decision"]["type"], "score")
         self.assertEqual(len(excerpts), 1)
 
-    def test_main_skips_oio_when_choice_has_only_one_candidate(self):
+    def test_main_skips_knot_when_choice_has_only_one_candidate(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
             data = repo / "data"
@@ -396,7 +396,7 @@ class GitaDecisionDemoTests(unittest.TestCase):
                 "description": "A teaching about action.",
             }]), encoding="utf-8")
             stdout = io.StringIO()
-            with patch("gita_decision_demo.call_oio") as call_oio:
+            with patch("gita_decision_demo.call_knot") as call_knot:
                 with contextlib.redirect_stdout(stdout):
                     status = main([
                         "action",
@@ -409,7 +409,7 @@ class GitaDecisionDemoTests(unittest.TestCase):
             self.assertFalse(payload["no_evidence"])
             self.assertTrue(payload["insufficient_candidates"])
             self.assertEqual(len(payload["retrieved_passages"]), 1)
-            call_oio.assert_not_called()
+            call_knot.assert_not_called()
 
     def test_main_allows_single_candidate_for_score_mode(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -428,7 +428,7 @@ class GitaDecisionDemoTests(unittest.TestCase):
                 "description": "A teaching about action.",
             }]), encoding="utf-8")
             stdout = io.StringIO()
-            with patch("gita_decision_demo.call_oio", return_value={"score": 2}) as call_oio:
+            with patch("gita_decision_demo.call_knot", return_value={"score": 2}) as call_knot:
                 with contextlib.redirect_stdout(stdout):
                     status = main([
                         "action",
@@ -441,7 +441,7 @@ class GitaDecisionDemoTests(unittest.TestCase):
             self.assertIsNone(status)
             self.assertEqual(payload["decision"], {"score": 2})
             self.assertEqual(len(payload["retrieved_passages"]), 1)
-            call_oio.assert_called_once()
+            call_knot.assert_called_once()
 
     def test_score_and_noul_payloads_have_valid_shapes(self):
         ranked = self.index.search("mind", limit=2)
