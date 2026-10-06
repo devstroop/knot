@@ -1,1 +1,1 @@
-"""Tests for OIO's optional training utilities."""
+"""Tests for KNOT's optional training utilities."""

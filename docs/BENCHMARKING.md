@@ -1,11 +1,11 @@
-# OIO runtime benchmarks
+# KNOT runtime benchmarks
 
 ## Purpose
 
-`runtime_bench` compares OIO's ONNX Runtime and Candle backends using the same
+`runtime_bench` compares KNOT's ONNX Runtime and Candle backends using the same
 Rust `Engine`, prompt/tokenizer path, English checkpoint, and CPU. It is an
 engineering benchmark for deciding whether Candle should become the preferred
-runtime for native OIO models. It is not an MLPerf result or a general model
+runtime for native KNOT models. It is not an MLPerf result or a general model
 quality evaluation.
 
 The harness measures:
@@ -29,7 +29,7 @@ per-call latency and states/second. Percentiles use nearest-rank p50/p95.
 Build with `--release`; debug timings are not comparable.
 
 The harness prints process CPU affinity and thread-related environment
-settings. `OIO_ORT_INTRA_THREADS` explicitly controls ORT's intra-op pool;
+settings. `KNOT_ORT_INTRA_THREADS` explicitly controls ORT's intra-op pool;
 `RAYON_NUM_THREADS` configures Candle's Rayon-backed CPU kernels at process
 startup. Use separate processes for each setting because thread pools are
 process-global. For example, compare both runtimes using 1, 2, and 4 worker
@@ -37,15 +37,15 @@ threads:
 
 ```bash
 for n in 1 2 4; do
-  OIO_MODEL_DIR="$HOME/.cache/oio/english" \
-  OIO_ORT_INTRA_THREADS="$n" RAYON_NUM_THREADS="$n" \
-  OIO_BENCH_MODE=single OIO_BENCH_ROUNDS=3 \
-  cargo test -p oio --features onnx,candle --release --test runtime_bench \
+  KNOT_MODEL_DIR="$HOME/.cache/knot/english" \
+  KNOT_ORT_INTRA_THREADS="$n" RAYON_NUM_THREADS="$n" \
+  KNOT_BENCH_MODE=single KNOT_BENCH_ROUNDS=3 \
+  cargo test -p knot --features onnx,candle --release --test runtime_bench \
     -- --ignored --nocapture
 done
 ```
 
-Set `OIO_CANDLE_PROFILE=1` to report average Candle tensor preparation,
+Set `KNOT_CANDLE_PROFILE=1` to report average Candle tensor preparation,
 ModernBERT encoder, custom decision-head, and classifier/output-copy time per
 forward call. Profiling adds timing/locking overhead and should be used to
 locate bottlenecks, not to publish final latency numbers. Set it in the
@@ -101,7 +101,7 @@ The four-thread run is much faster than the default and is the best of these
 three settings for both backends. Setting equal thread counts therefore
 narrows, but does not close, the gap.
 
-With `OIO_CANDLE_PROFILE=1`, four-thread Candle time averaged approximately
+With `KNOT_CANDLE_PROFILE=1`, four-thread Candle time averaged approximately
 0.01 ms tensor preparation, 385 ms ModernBERT encoder, 36 ms custom
 decision-head, and 0.75 ms classifier/output-copy per call. Thus the encoder
 accounts for roughly 91% of profiled Candle forward time and is the rational
@@ -136,14 +136,14 @@ separate runs and does not justify requiring host-specific native codegen.
 ## Run
 
 The checkpoint directory must contain both `laya.onnx` (and its external data
-file) and `model.safetensors`, along with OIO's usual tokenizer/config files.
-The pinned English checkpoint in `~/.cache/oio/english` is suitable.
+file) and `model.safetensors`, along with KNOT's usual tokenizer/config files.
+The pinned English checkpoint in `~/.cache/knot/english` is suitable.
 
 ```bash
-cd oio
-OIO_MODEL_DIR="$HOME/.cache/oio/english" \
-OIO_BENCH_ROUNDS=20 \
-cargo test -p oio --features onnx,candle --release --test runtime_bench \
+cd knot
+KNOT_MODEL_DIR="$HOME/.cache/knot/english" \
+KNOT_BENCH_ROUNDS=20 \
+cargo test -p knot --features onnx,candle --release --test runtime_bench \
   -- --ignored --nocapture
 ```
 
@@ -151,17 +151,17 @@ An Intel MKL backend was explored as a possible CPU-kernel optimization, but
 the optional MKL integration did not link in this environment: Candle 0.11's
 MKL path referenced `hgemm_`, which was not provided by the bundled MKL
 2020.1-3038006115 library. No MKL performance result was obtained, so it is
-not included as a supported OIO feature.
+not included as a supported KNOT feature.
 
 The benchmark is ignored in regular test runs because it loads both large
-models and consumes CPU for several minutes. Increase `OIO_BENCH_ROUNDS` for
+models and consumes CPU for several minutes. Increase `KNOT_BENCH_ROUNDS` for
 more stable tail percentiles; use the same value and machine for comparisons.
 Run at least three fresh processes and report the median of each run's summary
 for a release decision.
 
 Record the following with any published result:
 
-- OIO commit, checkpoint revision/digest, Rust version, OS/kernel, CPU model,
+- KNOT commit, checkpoint revision/digest, Rust version, OS/kernel, CPU model,
   memory, and whether the machine was otherwise idle.
 - Compiler profile and features, benchmark rounds, device, and thread/runtime
   settings. Do not compare release results to debug builds.
@@ -180,7 +180,7 @@ not infer a universal backend winner from one CPU/checkpoint.
 ## Model quality is a separate question
 
 The 12-case `eval_english.jsonl` fixture measures existing-model parity and
-sanity, not whether an OIO-trained model is better. A model-quality benchmark
+sanity, not whether an KNOT-trained model is better. A model-quality benchmark
 needs a frozen, representative held-out dataset, a predeclared metric and
 acceptance threshold, and explicit calibration/robustness measurements.
 Keep training/evaluation data separate from model selection where possible.
@@ -194,11 +194,11 @@ score.
   describes scenarios, load generation, latency/throughput metrics, and
   quality targets. Its [benchmark paper](https://arxiv.org/abs/1911.02549)
   explains the motivation for controlled, representative inference workloads.
-  OIO's microbenchmark is much narrower and should not be presented as an
+  KNOT's microbenchmark is much narrower and should not be presented as an
   MLPerf-compliant measurement.
 - [PyTorch benchmark timer quick start](https://docs.pytorch.org/tutorials/recipes/recipes/timer_quick_start.html)
   demonstrates warm-up/repeated measurements and controlling thread count.
-  The OIO harness similarly separates warm-up and timed work; backend default
+  The KNOT harness similarly separates warm-up and timed work; backend default
   thread settings are recorded as a limitation rather than changed invisibly.
 - [Criterion.rs user guide](https://bheisler.github.io/criterion.rs/book/)
   is a useful reference for statistical microbenchmark design. This first
@@ -207,7 +207,7 @@ score.
   tuning target.
 - [Candle examples](https://github.com/huggingface/candle/tree/main/candle-examples/examples)
   provide concrete Rust-native model loading/inference implementations across
-  transformer and other model families. OIO's benchmark compares its actual
+  transformer and other model families. KNOT's benchmark compares its actual
   Candle ModernBERT implementation to its actual ORT path, not those unrelated
   example models.
 - [ONNX concepts](https://onnx.ai/onnx/intro/concepts.html) explains the

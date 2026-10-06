@@ -2,7 +2,7 @@
 
 Reference notes for the wire-compat hardening pass: what Laya actually does,
 read out of the source at `laya/laya/` (the repo this workspace vendors
-alongside `oio/`). `docs/COMPAT.md` states the oio-side contract; this file
+alongside `knot/`). `docs/COMPAT.md` states the knot-side contract; this file
 records the evidence it is built from. Nothing here is an issue tracker — it
 is the behaviour being ported.
 

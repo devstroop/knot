@@ -1,1 +1,1 @@
-"""Optional OIO research and training utilities."""
+"""Optional KNOT research and training utilities."""

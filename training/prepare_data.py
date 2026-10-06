@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download pinned public data and build leakage-checked OIO JSONL splits."""
+"""Download pinned public data and build leakage-checked KNOT JSONL splits."""
 
 import argparse
 import csv
@@ -70,7 +70,7 @@ def download(url, path, expected_sha256):
             prefix=path.name + ".", suffix=".download", dir=path.parent, delete=False
         ) as output:
             temporary_path = Path(output.name)
-            request = Request(url, headers={"User-Agent": "OIO-training-data/1"})
+            request = Request(url, headers={"User-Agent": "KNOT-training-data/1"})
             with urlopen(request, timeout=60) as response:
                 while True:
                     chunk = response.read(1024 * 1024)
@@ -414,7 +414,7 @@ def main():
     parser.add_argument("--output-dir", default="training/out/data")
     parser.add_argument(
         "--cache-dir",
-        default=str(Path.home() / ".cache" / "oio" / "training-data"),
+        default=str(Path.home() / ".cache" / "knot" / "training-data"),
     )
     args = parser.parse_args()
     try:

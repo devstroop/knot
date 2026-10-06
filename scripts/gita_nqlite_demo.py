@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Ask OIO to judge Gita passages retrieved from nqlite.
+"""Ask KNOT to judge Gita passages retrieved from nqlite.
 
 Same typed-decision contract as `gita_decision_demo.py`, but retrieval comes
 from a long-lived `nql-server --stdio` subprocess (hybrid `::bm25` plus
 MiniLM cosine, fused with RRF) instead of the hand-rolled Python indexes.
 Ranking uses the full query text, exactly as the comparison spike measured;
 the abstention decision uses a companion BM25 query over the query's content
-terms only, which reproduces oio's own stopword-aware no-evidence semantics.
+terms only, which reproduces knot's own stopword-aware no-evidence semantics.
 Retrieval plumbing (server ownership, ingest, row parsing) is shared with
 `gita_nqlite_spike.py`.
 """
@@ -21,7 +21,7 @@ if __package__ in (None, ""):
         TOKEN_RE,
         STOP_WORDS,
         build_request,
-        call_oio,
+        call_knot,
         clean_text,
         corpus_metadata,
         format_excerpts,
@@ -42,7 +42,7 @@ else:
         TOKEN_RE,
         STOP_WORDS,
         build_request,
-        call_oio,
+        call_knot,
         clean_text,
         corpus_metadata,
         format_excerpts,
@@ -94,7 +94,7 @@ def check_evidence(server, query, top_k):
     """Companion BM25 query over content terms.
 
     Returns (has_evidence, max_bm25_score). A query with no content terms,
-    or with no positively scoring row, carries no retrieval evidence and OIO
+    or with no positively scoring row, carries no retrieval evidence and KNOT
     is not called.
     """
     terms = content_terms(query)
@@ -132,7 +132,7 @@ def main(argv=None):
     parser.add_argument("--author", default="Swami Sivananda")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--mode", choices=("choice", "score", "noul"), default="choice")
-    parser.add_argument("--oio-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--knot-url", default="http://127.0.0.1:8000")
     parser.add_argument("--timeout", type=float, default=120.0)
     args = parser.parse_args(argv)
     if args.top_k < 1 or args.top_k > 20:
@@ -158,7 +158,7 @@ def main(argv=None):
                 "corpus": corpus,
                 "caveat": (
                     "The query has no content terms after stopword removal; "
-                    "OIO was not called and no decision was made."
+                    "KNOT was not called and no decision was made."
                 ),
             }, ensure_ascii=False, indent=2))
             return 0
@@ -182,7 +182,7 @@ def main(argv=None):
                 "corpus": corpus,
                 "caveat": (
                     "No indexed English translation matched the query's content "
-                    "terms; OIO was not called and no decision was made."
+                    "terms; KNOT was not called and no decision was made."
                 ),
             }, ensure_ascii=False, indent=2))
             return 0
@@ -198,12 +198,12 @@ def main(argv=None):
                 "corpus": corpus,
                 "caveat": (
                     "Choice mode requires at least two retrieved candidates; "
-                    "OIO was not called and no decision was made."
+                    "KNOT was not called and no decision was made."
                 ),
             }, ensure_ascii=False, indent=2))
             return 0
         request, excerpts = build_request(args.query, results, args.mode)
-        answer = call_oio(args.oio_url, request, args.timeout)
+        answer = call_knot(args.knot_url, request, args.timeout)
     except (OSError, ValueError, RuntimeError) as exc:
         parser.error(str(exc))
 

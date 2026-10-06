@@ -1,4 +1,4 @@
-"""Generate crates/oio/src/lang_data.rs from laya/laya/lang.py data tables."""
+"""Generate crates/knot/src/lang_data.rs from laya/laya/lang.py data tables."""
 import sys
 
 sys.path.insert(0, "/home/devstroop/oio-workspace/laya")
@@ -37,6 +37,6 @@ for name, rs in ranges:
     parts.append(f'    ("{name}", &[{", ".join(f"({lo:#x}, {hi:#x})" for lo, hi in rs)}]),')
 parts.append("];")
 
-with open("/home/devstroop/oio-workspace/oio/crates/oio/src/lang_data.rs", "w") as f:
+with open("/home/devstroop/oio-workspace/knot/crates/knot/src/lang_data.rs", "w") as f:
     f.write("\n\n".join(parts) + "\n")
 print("wrote lang_data.rs")

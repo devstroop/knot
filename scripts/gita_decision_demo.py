@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Retrieve Bhagavad Gita verses, then ask a running OIO server to judge them."""
+"""Retrieve Bhagavad Gita verses, then ask a running KNOT server to judge them."""
 
 import argparse
 import collections
@@ -343,7 +343,7 @@ def build_request(query, results, mode):
     if mode not in {"choice", "score", "noul"}:
         raise ValueError("mode must be choice, score, or noul")
     if not results:
-        raise ValueError("cannot ask OIO to decide without retrieved evidence")
+        raise ValueError("cannot ask KNOT to decide without retrieved evidence")
     if mode == "choice" and len(results) < 2:
         raise ValueError("choice mode requires at least two retrieved candidates")
     excerpts = format_excerpts(results)
@@ -413,7 +413,7 @@ def format_excerpts(results):
     ]
 
 
-def call_oio(base_url, request, timeout):
+def call_knot(base_url, request, timeout):
     url = base_url.rstrip("/") + "/v1/systemone"
     body = json.dumps(request, ensure_ascii=False).encode("utf-8")
     http_request = urllib.request.Request(
@@ -427,19 +427,19 @@ def call_oio(base_url, request, timeout):
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError("OIO returned HTTP %d: %s" % (exc.code, detail)) from exc
+        raise RuntimeError("KNOT returned HTTP %d: %s" % (exc.code, detail)) from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError("could not reach OIO at %s: %s" % (url, exc.reason)) from exc
+        raise RuntimeError("could not reach KNOT at %s: %s" % (url, exc.reason)) from exc
     except json.JSONDecodeError as exc:
-        raise RuntimeError("OIO returned invalid JSON: %s" % exc) from exc
+        raise RuntimeError("KNOT returned invalid JSON: %s" % exc) from exc
     if not isinstance(payload, dict):
-        raise RuntimeError("OIO response must be a JSON object")
+        raise RuntimeError("KNOT response must be a JSON object")
     answers = payload.get("answers")
     if not isinstance(answers, dict):
-        raise RuntimeError("OIO response is missing its answers object")
+        raise RuntimeError("KNOT response is missing its answers object")
     answer = answers.get("gita_decision")
     if not isinstance(answer, dict):
-        raise RuntimeError("OIO response is missing answers.gita_decision")
+        raise RuntimeError("KNOT response is missing answers.gita_decision")
     return answer
 
 
@@ -585,7 +585,7 @@ def main(argv=None):
     parser.add_argument("--author", default="Swami Sivananda", help="English translation author")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--mode", choices=("choice", "score", "noul"), default="choice")
-    parser.add_argument("--oio-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--knot-url", default="http://127.0.0.1:8000")
     parser.add_argument("--timeout", type=float, default=120.0)
     args = parser.parse_args(argv)
     if args.top_k < 1 or args.top_k > 20:
@@ -608,7 +608,7 @@ def main(argv=None):
                 "no_evidence": True,
                 "corpus": corpus,
                 "caveat": (
-                    "No indexed English translation matched the query terms; OIO was not "
+                    "No indexed English translation matched the query terms; KNOT was not "
                     "called and no decision was made."
                 ),
             }, ensure_ascii=False, indent=2))
@@ -624,12 +624,12 @@ def main(argv=None):
                 "corpus": corpus,
                 "caveat": (
                     "Choice mode requires at least two positive-scoring passages; "
-                    "OIO was not called and no decision was made."
+                    "KNOT was not called and no decision was made."
                 ),
             }, ensure_ascii=False, indent=2))
             return 0
         request, excerpts = build_request(args.query, results, args.mode)
-        answer = call_oio(args.oio_url, request, args.timeout)
+        answer = call_knot(args.knot_url, request, args.timeout)
     except (OSError, ValueError, RuntimeError) as exc:
         parser.error(str(exc))
 

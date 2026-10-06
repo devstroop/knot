@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate local Gita retrieval separately from OIO decisions."""
+"""Evaluate local Gita retrieval separately from KNOT decisions."""
 
 import argparse
 import json
