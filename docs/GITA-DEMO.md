@@ -261,6 +261,97 @@ to tune a production relevance threshold, and the filter is still lexical, not
 a semantic retriever. Reproduce the ablations with `--min-query-overlap 2`
 and `--min-query-overlap 3`, respectively.
 
+## nqlite hybrid comparison (spike)
+
+As a retrieval-side experiment, the same English eval sets were run through
+[nqlite](https://github.com/devstroop/nqlite) hybrid retrieval instead of the
+hand-rolled Python indexes. A single long-lived `nql-server --stdio`
+subprocess ingested the 701 Sivananda verses (citation, author, text) with
+locally computed MiniLM-384 embeddings — the same model as the oio semantic
+baseline, since nqlite vectors are bring-your-own by design — then answered a
+hybrid query per case (`::bm25` + `vector::similarity`, RRF k=60) at k=5.
+Answerable metrics reuse oio's `evaluate_retrieval` through a small index
+shim, so the numbers are directly comparable. nqlite ranks every candidate
+and always returns its top-k rows (fused RRF scores are never zero), so
+unanswerable abstention was measured separately with a BM25-positive
+companion query: a case counts as no-evidence only when no returned row has a
+positive BM25 score.
+
+```bash
+python3 scripts/gita_nqlite_spike.py \
+  --gita-repo ../gita \
+  --server ../nqlite/target/debug/nql-server
+```
+
+The harness is `scripts/gita_nqlite_spike.py`; it needs the FastEmbed
+environment from `scripts/requirements-gita-semantic.txt` and a built
+`nql-server` binary. Corpus revision `c6fce39`, the same checkout the English
+sets were validated against.
+
+| Config | Dev cite / case / MRR / no-ev | Holdout cite / case / MRR / no-ev |
+|---|---:|---:|
+| oio BM25 default | 1.000 / 1.000 / 0.917 / 0.417 | 0.938 / 1.000 / 0.861 / 0.333 |
+| oio hybrid + cutoff | 1.000 / 1.000 / 0.917 / 0.500 | 0.938 / 1.000 / 0.958 / 0.667 |
+| oio MiniLM + cutoff | 0.750 / 0.917 / 0.757 / 1.000 | 0.750 / 0.917 / 0.778 / 1.000 |
+| nqlite hybrid | 0.900 / 1.000 / 0.875 / 0.000 | 1.000 / 1.000 / 0.917 / 0.000 |
+
+nqlite's answerable ranking is competitive: on the frozen holdout it beats
+oio BM25 on citation recall (1.000 vs 0.938) and MRR (0.917 vs 0.861); on the
+dev set it trails slightly (0.900 vs 1.000) on two partial citation misses —
+BG 6.16 ranked below top-5 for the moderation question, and BG 6.9 for the
+friend-and-foe question — while case recall stayed 1.000 in both sets. The gap
+traces to tokenization: nqlite BM25 lowercases and splits on
+non-alphanumerics with no stopwords and no stemming, so generic words match
+and every unanswerable query returns candidates. Abstention is therefore
+structurally absent (0.000); any `no_evidence` policy for an nqlite-backed
+demo must live client-side, the same way the current demo's zero-score-tie
+exclusion does.
+
+This is a comparison, not a migration: the default demo, eval sets, and
+thresholds are unchanged, and these small-set numbers do not establish that
+either retriever generalizes. The interesting follow-up is a demo that keeps
+oio's abstention rule on top of nqlite recall.
+
+## nqlite-backed decision demo
+
+`scripts/gita_nqlite_demo.py` is that follow-up: the same typed-decision
+contract as `gita_decision_demo.py` (`choice`/`score`/`noul` over retrieved
+excerpts with citations, same OIO request shapes via the shared builders),
+but retrieval comes from nqlite hybrid queries instead of the hand-rolled
+indexes. Ranking uses the full query text, exactly as the spike measured;
+abstention uses a companion BM25 query over the query's content terms only
+(English stopwords stripped, unstemmed), which reproduces oio's own
+stopword-aware no-evidence semantics — measured at 0.417 dev / 0.333
+holdout abstention, identical to oio BM25's 0.417 / 0.333. A query with no
+content terms abstains without starting the server. Retrieval plumbing
+(server ownership, ingest, row parsing) is shared with the spike script.
+
+```bash
+OIO_MODEL_DIR=/path/to/laya-english cargo run -p oio-serve  # port 8000
+python3 scripts/gita_nqlite_demo.py \
+  "How should someone act without becoming attached to the result?" \
+  --gita-repo ../gita \
+  --server ../nqlite/target/debug/nql-server \
+  --mode choice --top-k 5
+```
+
+The response carries the same `decision` / `retrieved_passages` /
+`no_evidence` / `corpus` shape plus a `retriever` block (engine, hybrid mode,
+evidence rule, BM25 max score, embedding model). Unit tests use a fake server
+and never touch a real binary: `python3 -m unittest discover -s scripts -p
+'test_gita_nqlite_demo.py' -v` (10 tests: evidence rule, abstention and
+insufficient-candidate skips, payload shapes, citation mapping, CLI
+validation).
+
+Smoke observation with the existing English checkpoint (`55cf4c4...`):
+nqlite retrieved BG 3.5/3.19/3.25/3.26/18.23 for the attachment question and
+OIO chose BG 3.5 at confidence ~0.25; score mode returned 2.63 ("relevant
+support but gaps"); noul returned true at 0.749; and a Bitcoin-price query
+abstained with BM25 max score 0.0 and no OIO call. As with the BM25 demo, the
+checkpoint is not a qualified Gita reranker — confidences are low and the
+ranking comes from the retriever. The live demo path needs the FastEmbed
+environment (`scripts/requirements-gita-semantic.txt`); the unit tests do not.
+
 ## Hindi holdout
 
 The authorized clone also carries Hindi translations, so the retrieval
