@@ -15,10 +15,15 @@ from gita_decision_demo import (
     SemanticIndex,
     build_request,
     evaluate_retrieval,
+    load_passages,
     main,
     tokenize,
 )
-from evaluate_gita_retrieval import load_cases
+from evaluate_gita_retrieval import DEFAULT_GITA_REPO, load_cases
+from evaluate_gita_retrieval import main as evaluate_main
+
+SCRIPTS_DIR = Path(__file__).resolve().parent
+HAVE_CORPUS = (DEFAULT_GITA_REPO / "data" / "translation.json").is_file()
 
 
 def passage(chapter, verse, text):
@@ -145,9 +150,8 @@ class GitaDecisionDemoTests(unittest.TestCase):
         self.assertEqual(report["unanswerable_no_evidence_rate"], 1.0)
 
     def test_holdout_set_is_balanced_and_disjoint_from_development_set(self):
-        scripts_dir = Path(__file__).resolve().parent
-        holdout = load_cases(scripts_dir / "gita_retrieval_holdout.jsonl")
-        development = load_cases(scripts_dir / "gita_retrieval_eval.jsonl")
+        holdout = load_cases(SCRIPTS_DIR / "gita_retrieval_holdout.jsonl")
+        development = load_cases(SCRIPTS_DIR / "gita_retrieval_eval.jsonl")
         self.assertEqual(len(holdout), 24)
         self.assertEqual(sum(case["answerable"] for case in holdout), 12)
         self.assertEqual(sum(not case["answerable"] for case in holdout), 12)
@@ -159,6 +163,83 @@ class GitaDecisionDemoTests(unittest.TestCase):
             {case["query"] for case in holdout}
             & {case["query"] for case in development}
         )
+
+    def test_devanagari_tokens_keep_whole_words(self):
+        self.assertEqual(
+            tokenize("धर्मक्षेत्रे कुरुक्षेत्र कर्मफल"),
+            ("धर्मक्षेत्रे", "कुरुक्षेत्र", "कर्मफल"),
+        )
+        self.assertEqual(tokenize("और फल की इच्छा नहीं"), ("फल", "इच्छा"))
+        index = BM25Index([passage("2", "47", "कर्म करने में अधिकार है, फल में नहीं।")])
+        ranked = index.search("कर्म और फल की इच्छा", limit=1)
+        self.assertGreater(ranked[0][0], 0)
+
+    def test_hindi_holdout_is_balanced_and_disjoint_from_other_sets(self):
+        holdout = load_cases(SCRIPTS_DIR / "gita_retrieval_holdout_hi.jsonl")
+        others = load_cases(SCRIPTS_DIR / "gita_retrieval_holdout.jsonl") + load_cases(
+            SCRIPTS_DIR / "gita_retrieval_eval.jsonl"
+        )
+        self.assertEqual(len(holdout), 24)
+        self.assertEqual(sum(case["answerable"] for case in holdout), 12)
+        self.assertEqual(sum(not case["answerable"] for case in holdout), 12)
+        self.assertTrue(all(case["case_id"].startswith("hi-") for case in holdout))
+        self.assertEqual(
+            len({case["case_id"] for case in holdout}), len(holdout)
+        )
+        self.assertEqual(len({case["query"] for case in holdout}), len(holdout))
+        self.assertFalse(
+            {case["case_id"] for case in holdout}
+            & {case["case_id"] for case in others}
+        )
+        self.assertFalse(
+            {case["query"] for case in holdout} & {case["query"] for case in others}
+        )
+
+    @unittest.skipUnless(HAVE_CORPUS, "local Gita clone is not available")
+    def test_hindi_holdout_citations_exist_in_hindi_index(self):
+        passages = load_passages(DEFAULT_GITA_REPO, "Swami Tejomayananda", "hindi")
+        self.assertEqual(len(passages), 701)
+        self.assertTrue(all(p.author == "Swami Tejomayananda" for p in passages))
+        available = {p.citation for p in passages}
+        for case in load_cases(SCRIPTS_DIR / "gita_retrieval_holdout_hi.jsonl"):
+            unknown = set(case["relevant_citations"]) - available
+            self.assertFalse(unknown, "%s cites %s" % (case["case_id"], sorted(unknown)))
+
+    @unittest.skipUnless(HAVE_CORPUS, "local Gita clone is not available")
+    def test_load_passages_rejects_unknown_language_and_author(self):
+        with self.assertRaisesRegex(ValueError, "language must be english or hindi"):
+            load_passages(DEFAULT_GITA_REPO, "Swami Sivananda", "sanskrit")
+        with self.assertRaisesRegex(ValueError, "Hindi translation author 'Nobody'"):
+            load_passages(DEFAULT_GITA_REPO, "Nobody", "hindi")
+
+    def test_hindi_evaluation_requires_bm25(self):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as raised:
+                evaluate_main([
+                    "--gita-repo", str(DEFAULT_GITA_REPO),
+                    "--language", "hindi",
+                    "--retriever", "semantic",
+                ])
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("English-only", stderr.getvalue())
+
+    @unittest.skipUnless(HAVE_CORPUS, "local Gita clone is not available")
+    def test_hindi_evaluation_report_records_language_and_author(self):
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            evaluate_main([
+                "--gita-repo", str(DEFAULT_GITA_REPO),
+                "--language", "hindi",
+                "--eval-set", str(SCRIPTS_DIR / "gita_retrieval_holdout_hi.jsonl"),
+                "--top-k", "5",
+            ])
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(report["language"], "hindi")
+        self.assertEqual(report["author"], "Swami Tejomayananda")
+        self.assertEqual(report["corpus"]["language"], "hindi")
+        self.assertEqual(report["retriever"], "bm25")
+        self.assertEqual(report["case_count"], 24)
 
     def test_semantic_index_ranks_cosine_similarities(self):
         class FakeTextEmbedding:
