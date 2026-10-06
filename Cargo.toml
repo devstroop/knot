@@ -1,15 +1,15 @@
 [workspace]
 resolver = "2"
-members = ["crates/oio", "crates/oio-serve"]
+members = ["crates/knot", "crates/knot-serve"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
-repository = "https://github.com/oio-dev/oio"
+repository = "https://github.com/devstroop/knot"
 
 [workspace.dependencies]
-oio = { path = "crates/oio" }
+knot = { path = "crates/knot" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 indexmap = { version = "2", features = ["serde"] }

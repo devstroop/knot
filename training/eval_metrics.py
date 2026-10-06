@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Held-out metric aggregation for OIO training experiments.
+"""Held-out metric aggregation for KNOT training experiments.
 
 Aggregation and calibration math are pure Python so they can be unit-tested
 without torch; the model forward pass takes torch as an explicit argument,

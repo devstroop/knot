@@ -1,6 +1,6 @@
-# OIO training pipeline
+# KNOT training pipeline
 
-OIO keeps ONNX Runtime and Candle as configurable inference engines. Training
+KNOT keeps ONNX Runtime and Candle as configurable inference engines. Training
 is a separate, optional research workflow: it must not add Python or training
 dependencies to the Rust serving binaries, and it must not make either runtime
 mandatory.
@@ -10,9 +10,9 @@ mandatory.
 The first experiment is English typed decisions across multiple domains. It
 starts from the pinned Laya checkpoint, freezes its ModernBERT encoder, and
 trains only the decision head on CPU. It is a pipeline and compatibility
-smoke test, not a claim that OIO has trained a better model.
+smoke test, not a claim that KNOT has trained a better model.
 
-All three OIO primitives are represented, with these important distinctions:
+All three KNOT primitives are represented, with these important distinctions:
 
 | Primitive | Source | Label meaning and limitation |
 |---|---|---|
@@ -46,6 +46,11 @@ Each row contains:
   source-row identity, and derivation.
 - `language` and `tags`: slice/report metadata.
 
+Dataset IDs are frozen data-plane identifiers: the synthetic source stays
+`oio-authored/score-smoke` (revision `oio-training-v1`) even after the
+product rename, so existing prepared corpora, manifests, and feature caches
+keep validating. Do not "fix" these strings to match the product name.
+
 The prepare step uses MASSIVE's official validation and test splits, carving
 calibration rows from its training split. BANKING77 has no official validation
 split, so validation and calibration are carved deterministically and
@@ -77,7 +82,7 @@ and attribution obligations for the intended distribution.
 ## Frozen-head smoke run
 
 The smoke trainer uses the Laya reference implementation of the exact typed
-head and an already-downloaded, locally pinned OIO-compatible checkpoint. It
+head and an already-downloaded, locally pinned KNOT-compatible checkpoint. It
 does not fetch weights. Install the optional training requirements and make a
 clean Laya source checkout available through `--laya-source`:
 
@@ -280,7 +285,7 @@ result.
    blocks any score-quality claim.
 3. **Canonical artifact:** version the training checkpoint and derive both
    ONNX and Candle-compatible artifacts from the same weights; retain
-   `OIO_RUNTIME=onnx|candle`.
+   `KNOT_RUNTIME=onnx|candle`.
 4. **Small student:** only after stage two demonstrates a repeatable held-out
    gain, compare distillation into a smaller model compatible with both
    runtimes.

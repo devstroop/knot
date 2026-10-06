@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Three-way demonstration runner: Laya vs oio live, Jev recorded/published.
+"""Three-way demonstration runner: Laya vs knot live, Jev recorded/published.
 
 Corpora
-  en     12-case recorded English eval fixture (crates/oio/tests/fixtures/eval_english.jsonl)
+  en     12-case recorded English eval fixture (crates/knot/tests/fixtures/eval_english.jsonl)
   feishu 64-case frozen Chinese diagnostic (feishu_zh checkout, both modes)
   hi     100-case MASSIVE intent slice (demo/cases/massive_hi.json, seed-13 20-option protocol)
 
@@ -31,7 +31,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LAYA_CHECKOUT = Path(os.environ.get("DEMO_LAYA_CHECKOUT", ROOT.parent / "laya"))
-OIO_CACHE = Path(os.environ.get("DEMO_OIO_CACHE", "/home/devstroop/oio-cache"))
+KNOT_CACHE = Path(os.environ.get("DEMO_KNOT_CACHE", "/home/devstroop/knot-cache"))
 HF_SNAP = Path(
     os.environ.get(
         "DEMO_HF_SNAP",
@@ -40,9 +40,9 @@ HF_SNAP = Path(
         / "snapshots/55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851",
     )
 )
-OIO_BIN = Path(os.environ.get("DEMO_OIO_BIN", ROOT / "target/release/oio-serve"))
+KNOT_BIN = Path(os.environ.get("DEMO_KNOT_BIN", ROOT / "target/release/knot"))
 LAYA_SERVE = Path(os.environ.get("DEMO_LAYA_SERVE", ROOT / ".venv-demo/bin/laya-serve"))
-OIO_URL = os.environ.get("DEMO_OIO_URL", "http://127.0.0.1:8977")
+KNOT_URL = os.environ.get("DEMO_KNOT_URL", "http://127.0.0.1:8977")
 LAYA_URL = os.environ.get("DEMO_LAYA_URL", "http://127.0.0.1:8001")
 FEISHU_DIR = LAYA_CHECKOUT / "research/benchmarks/feishu_zh"
 RESERVED_REVISION = "55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851"
@@ -199,17 +199,17 @@ def port_open(url):
     return get_ok(url.replace("/v1/systemone", "") + "/health", timeout=1)
 
 
-def oio_server(logs):
+def knot_server(logs):
     env = dict(os.environ)
-    env.pop("OIO_API_KEY", None)
-    env.pop("OIO_MODEL_DIR", None)
-    env["OIO_HOST"] = "127.0.0.1"
-    env["OIO_PORT"] = OIO_URL.rsplit(":", 1)[1]
-    env["OIO_MODELS"] = (
-        f"english={OIO_CACHE / 'laya-english'},"
+    env.pop("KNOT_API_KEY", None)
+    env.pop("KNOT_MODEL_DIR", None)
+    env["KNOT_HOST"] = "127.0.0.1"
+    env["KNOT_PORT"] = KNOT_URL.rsplit(":", 1)[1]
+    env["KNOT_MODELS"] = (
+        f"english={KNOT_CACHE / 'laya-english'},"
         f"multilingual={HF_SNAP / 'multilingual'}"
     )
-    return Server("oio-serve", [str(OIO_BIN)], env, OIO_URL + "/health", logs / "oio-serve.log")
+    return Server("knot", [str(KNOT_BIN)], env, KNOT_URL + "/health", logs / "knot.log")
 
 
 def laya_server(logs):
@@ -228,7 +228,7 @@ def laya_server(logs):
 
 # --------------------------------------------------------------------------- corpora
 def build_en(limit=None):
-    path = ROOT / "crates/oio/tests/fixtures/eval_english.jsonl"
+    path = ROOT / "crates/knot/tests/fixtures/eval_english.jsonl"
     require(path.exists(), f"missing {path} (in-repo fixture)")
     cases = []
     for i, line in enumerate(path.read_text(encoding="utf-8").splitlines()):
@@ -501,13 +501,13 @@ def summarize(cases, calls, recorded_rows, archived_hi, archived_feishu_summary)
         return {"same": same, "n": n}
 
     if "en" in out["per_corpus"]:
-        out["agreement"]["en_oio_vs_laya"] = agree("oio", "laya", "en")
+        out["agreement"]["en_knot_vs_laya"] = agree("knot", "laya", "en")
         # mean |dp| over choice probabilities (repeat 0)
         diffs = []
         for case in cases:
             if case["corpus"] != "en":
                 continue
-            ca = first_ok("oio", "en", case["id"], case["mode"])
+            ca = first_ok("knot", "en", case["id"], case["mode"])
             cb = first_ok("laya", "en", case["id"], case["mode"])
             if ca and cb:
                 d = prob_mean_abs_diff(ca["answers"], cb["answers"], case["questions"])
@@ -516,18 +516,18 @@ def summarize(cases, calls, recorded_rows, archived_hi, archived_feishu_summary)
         out["agreement"]["en_prob_mean_abs_diff"] = statistics.mean(diffs) if diffs else None
 
     for mode in ("choice", "four_noul"):
-        out["agreement"][f"feishu_{mode}_oio_vs_laya"] = agree("oio", "laya", "feishu", mode)
-        out["agreement"][f"feishu_{mode}_oio_vs_jev_recorded"] = agree(
-            "oio", None, "feishu", mode, vs_rows=recorded_rows, vs_backend="jev")
+        out["agreement"][f"feishu_{mode}_knot_vs_laya"] = agree("knot", "laya", "feishu", mode)
+        out["agreement"][f"feishu_{mode}_knot_vs_jev_recorded"] = agree(
+            "knot", None, "feishu", mode, vs_rows=recorded_rows, vs_backend="jev")
         out["agreement"][f"feishu_{mode}_laya_vs_laya_recorded"] = agree(
             "laya", None, "feishu", mode, vs_rows=recorded_rows, vs_backend="laya")
 
-    out["agreement"]["hi_oio_vs_laya"] = agree("oio", "laya", "hi")
+    out["agreement"]["hi_knot_vs_laya"] = agree("knot", "laya", "hi")
     diffs = []
     for case in cases:
         if case["corpus"] != "hi":
             continue
-        ca = first_ok("oio", "hi", case["id"], case["mode"])
+        ca = first_ok("knot", "hi", case["id"], case["mode"])
         cb = first_ok("laya", "hi", case["id"], case["mode"])
         if ca and cb:
             d = prob_mean_abs_diff(ca["answers"], cb["answers"], case["questions"])
@@ -617,13 +617,13 @@ def render_report(meta, cases, samples, summary, recorded_summary, recorded_rows
 
     L = []
     add = L.append
-    add("# oio demonstration — Jev, Laya and oio side by side\n")
+    add("# knot demonstration — Jev, Laya and knot side by side\n")
     add("> GENERATED by `scripts/demo_engines.py` (via `scripts/demo.sh`) — "
          "rerun the command below to refresh. Raw evidence: `demo/results.json`.\n")
     add(f"- Run: {meta['run_at']} ({'smoke' if smoke else 'full'})")
     add(f"- Machine: {meta['machine']['cpu']} × {meta['machine']['cores']}, "
         f"{meta['machine']['mem_gb']} GB, {meta['machine']['platform']}")
-    add(f"- Revisions: oio `{meta['revisions']['oio']}`, laya checkout "
+    add(f"- Revisions: knot `{meta['revisions']['knot']}`, laya checkout "
         f"`{meta['revisions']['laya']}`, checkpoint pin `{RESERVED_REVISION[:12]}…`")
     add("- Engines over identical HTTP `POST /v1/systemone` bodies, one server "
         "resident at a time (warmup before timing), client wall clock\n")
@@ -640,18 +640,18 @@ def render_report(meta, cases, samples, summary, recorded_summary, recorded_rows
 
     # ---------------------------------------------------------------- English
     add("## English — recorded eval fixture (12 cases, choice/score/noul)\n")
-    add("| metric | Laya live (CPU) | oio live (CPU) |")
+    add("| metric | Laya live (CPU) | knot live (CPU) |")
     add("|---|---|---|")
-    add(f"| accuracy vs fixture labels | {acc('en','eval','laya')} | {acc('en','eval','oio')} |")
+    add(f"| accuracy vs fixture labels | {acc('en','eval','laya')} | {acc('en','eval','knot')} |")
     n, p50, p95 = lat("en", "eval", "laya")
-    n2, p502, p952 = lat("en", "eval", "oio")
+    n2, p502, p952 = lat("en", "eval", "knot")
     add(f"| latency p50 / p95 (ms) | {p50} / {p95} (n={n}) | {p502} / {p952} (n={n2}) |")
     add("")
     add("Scoring: `choice` exact; `score` rounded to the nearest level; `noul` "
         "thresholded at ≥ 0.5 (the wire returns the continuous signal, the "
         "fixture labels are boolean).")
-    ag = summary["agreement"].get("en_oio_vs_laya", {})
-    add(f"- **oio ↔ Laya agreement**: {agreement_cell(ag)} questions identical")
+    ag = summary["agreement"].get("en_knot_vs_laya", {})
+    add(f"- **knot ↔ Laya agreement**: {agreement_cell(ag)} questions identical")
     d = summary["agreement"].get("en_prob_mean_abs_diff")
     if d is not None:
         add(f"- mean |Δp| between the two engines on choice probabilities: **{d:.1e}** "
@@ -662,7 +662,7 @@ def render_report(meta, cases, samples, summary, recorded_summary, recorded_rows
 
     add("### Wire shape, live\n")
     add("One identical request, one response per engine (first English case). "
-        "Both engines round probabilities to 4 decimals; oio stores the "
+        "Both engines round probabilities to 4 decimals; knot stores the "
         "rounded value in f32, so `0.97509998…` is the same value as laya's "
         "`0.9751`. The recorded Jev shape sits beside a live response in the "
         "feishu section.\n")
@@ -698,11 +698,11 @@ def render_report(meta, cases, samples, summary, recorded_summary, recorded_rows
                 f"(n={e.get('questions')}) | {ms(t.get('p50_ms'))} | {ms(t.get('p95_ms'))} "
                 f"| this run |")
         add("")
-        a1 = summary["agreement"].get(f"feishu_{mode}_oio_vs_laya", {})
-        a2 = summary["agreement"].get(f"feishu_{mode}_oio_vs_jev_recorded", {})
+        a1 = summary["agreement"].get(f"feishu_{mode}_knot_vs_laya", {})
+        a2 = summary["agreement"].get(f"feishu_{mode}_knot_vs_jev_recorded", {})
         a3 = summary["agreement"].get(f"feishu_{mode}_laya_vs_laya_recorded", {})
-        add(f"- agreement `{mode}`: oio↔Laya-live **{agreement_cell(a1)}**, "
-            f"oio↔Jev-recorded {agreement_cell(a2)}, "
+        add(f"- agreement `{mode}`: knot↔Laya-live **{agreement_cell(a1)}**, "
+            f"knot↔Jev-recorded {agreement_cell(a2)}, "
             f"Laya-live↔Laya-recorded {agreement_cell(a3)}\n")
 
     add("### Wire shape, one feishu request (choice mode)\n")
@@ -751,15 +751,15 @@ def render_report(meta, cases, samples, summary, recorded_summary, recorded_rows
         add(f"| {eng} live (this box, CPU) | {fmt(e.get('accuracy'))} "
             f"(n={e.get('questions')}) | {e.get('questions')} | this run |")
     add("")
-    a = summary["agreement"].get("hi_oio_vs_laya", {})
-    add(f"- **oio ↔ Laya agreement**: {agreement_cell(a)} cases")
+    a = summary["agreement"].get("hi_knot_vs_laya", {})
+    add(f"- **knot ↔ Laya agreement**: {agreement_cell(a)} cases")
     d = summary["agreement"].get("hi_prob_mean_abs_diff")
     if d is not None:
         add(f"- mean |Δp| on the 20-way choice: **{d:.1e}**")
     n, p50, p95 = lat("hi", "massive-20", "laya")
-    n2, p502, p952 = lat("hi", "massive-20", "oio")
+    n2, p502, p952 = lat("hi", "massive-20", "knot")
     add(f"- latency: Laya p50 {p50} / p95 {p95} ms (n={n}); "
-        f"oio p50 {p502} / p95 {p952} ms (n={n2})\n")
+        f"knot p50 {p502} / p95 {p952} ms (n={n2})\n")
     add("Devanagari sample (first case, as routed to the multilingual checkpoint):\n")
     for eng in summary["engines"]:
         body = samples.get(eng, {}).get("hi")
@@ -787,11 +787,11 @@ def render_report(meta, cases, samples, summary, recorded_summary, recorded_rows
     add("- **Special-token resolution (found by this harness, fixed on this "
         "branch)**: mmBERT's vocabulary contains `<s>`/`</s>` as ordinary BPE "
         "tokens (ids 204/213) while its `tokenizer_config.json` declares "
-        "`cls_token: <bos>` / `sep_token: <eos>` (ids 2/1). oio resolved "
+        "`cls_token: <bos>` / `sep_token: <eos>` (ids 2/1). knot resolved "
         "CLS/SEP by candidate-string priority, so every multilingual prompt was "
         "framed with content tokens — four token ids per sequence, and the "
         "model answered from a differently framed prompt. On this harness "
-        "before the fix: oio↔Laya agreement 55/100 on hi (oio accuracy 0.270 "
+        "before the fix: knot↔Laya agreement 55/100 on hi (knot accuracy 0.270 "
         "vs Laya 0.460) and 28/64 on feishu choice, with confident *different* "
         "answers. Fixed in `prompt.rs` (declared specials win; SPEC §2; "
         "regression test); agreement is now 12/12, 64/64 + 64/64, 100/100.")
@@ -805,8 +805,8 @@ def render_report(meta, cases, samples, summary, recorded_summary, recorded_rows
     add("- **Jev's feishu columns are archived, not re-run**: no "
         "`TYPESAFE_API_KEY` exists in this environment, and the recording has "
         "archived-benchmark provenance (`docs/RESEARCH-COMPARE.md`).")
-    add("- **oio vs laya probability serialization**: both round to 4 decimals; "
-        "oio stores the rounded value in f32, so the JSON shows "
+    add("- **knot vs laya probability serialization**: both round to 4 decimals; "
+        "knot stores the rounded value in f32, so the JSON shows "
         "`0.97509998…` where laya shows `0.9751`.\n")
 
     # ---------------------------------------------------------------- reproduction
@@ -828,7 +828,7 @@ def main():
     ap.add_argument("--report", default=str(ROOT / "docs/DEMO.md"))
     ap.add_argument("--limit", type=int, default=None,
                     help="first N cases per corpus, single repeat (smoke)")
-    ap.add_argument("--engines", default="oio,laya")
+    ap.add_argument("--engines", default="knot,laya")
     ap.add_argument("--no-report", action="store_true")
     ap.add_argument("--report-only", action="store_true",
                     help="regenerate the report from an existing results.json "
@@ -857,13 +857,13 @@ def main():
     smoke = args.limit is not None
     repeats = SMOKE_REPEATS if smoke else FULL_REPEATS
 
-    require(OIO_BIN.exists(), f"{OIO_BIN} missing — scripts/demo.sh builds it")
+    require(KNOT_BIN.exists(), f"{KNOT_BIN} missing — scripts/demo.sh builds it")
     require(LAYA_SERVE.exists(), f"{LAYA_SERVE} missing — scripts/demo.sh creates the venv")
     require((HF_SNAP / "multilingual/laya.onnx").exists(),
              f"multilingual ONNX missing under {HF_SNAP} — run scripts/demo.sh")
-    require((OIO_CACHE / "laya-english/laya.onnx").exists(),
-             f"english checkpoint missing at {OIO_CACHE}/laya-english")
-    for port_check, name in ((OIO_URL, "oio"), (LAYA_URL, "laya")):
+    require((KNOT_CACHE / "laya-english/laya.onnx").exists(),
+             f"english checkpoint missing at {KNOT_CACHE}/laya-english")
+    for port_check, name in ((KNOT_URL, "knot"), (LAYA_URL, "laya")):
         require(not port_open(port_check),
                 f"port for {name} already serving at {port_check} — stop it first")
 
@@ -879,11 +879,11 @@ def main():
 
     engines = [e.strip() for e in args.engines.split(",") if e.strip()]
     all_calls, samples = [], {}
-    servers = {"oio": oio_server, "laya": laya_server}
+    servers = {"knot": knot_server, "laya": laya_server}
     for eng in engines:
-        require(eng in servers, f"unknown engine {eng!r} (oio/laya)")
+        require(eng in servers, f"unknown engine {eng!r} (knot/laya)")
         with servers[eng](logs):
-            all_calls += run_engine(eng, {"oio": OIO_URL, "laya": LAYA_URL}[eng],
+            all_calls += run_engine(eng, {"knot": KNOT_URL, "laya": LAYA_URL}[eng],
                                     cases, repeats, samples)
 
     meta = {
@@ -891,7 +891,7 @@ def main():
         "smoke": smoke,
         "repeats": repeats,
         "machine": machine_info(),
-        "revisions": {"oio": git_rev(ROOT), "laya": git_rev(LAYA_CHECKOUT)},
+        "revisions": {"knot": git_rev(ROOT), "laya": git_rev(LAYA_CHECKOUT)},
         "checkpoint_pin": RESERVED_REVISION,
         "hi_fixture_sha": hi_source.get("sha256_of_gz"),
         "feishu_manifest": {k: feishu_manifest.get(k)

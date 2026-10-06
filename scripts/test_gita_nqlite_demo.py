@@ -97,10 +97,10 @@ class NqliteDemoTests(unittest.TestCase):
             )
             with contextlib.redirect_stdout(stdout):
                 with patch(
-                    "gita_nqlite_demo.call_oio", return_value={"ok": True}
-                ) as call_oio:
+                    "gita_nqlite_demo.call_knot", return_value={"ok": True}
+                ) as call_knot:
                     status = main(argv)
-        return status, json.loads(stdout.getvalue()), call_oio
+        return status, json.loads(stdout.getvalue()), call_knot
 
     def test_content_terms_drop_stopwords_unstemmed(self):
         self.assertEqual(
@@ -140,41 +140,41 @@ class NqliteDemoTests(unittest.TestCase):
             [program for program in quiet.programs if "::bm25" in program], []
         )
 
-    def test_zero_evidence_skips_oio(self):
+    def test_zero_evidence_skips_knot(self):
         server = FakeServer(hybrid_rows=[(1, 0.02)], bm25_rows=[(1, 0.0)])
-        status, payload, call_oio = self.run_main(["how should I act?"], server)
+        status, payload, call_knot = self.run_main(["how should I act?"], server)
         self.assertEqual(status, 0)
         self.assertTrue(payload["no_evidence"])
         self.assertIsNone(payload["decision"])
         self.assertEqual(payload["retrieved_passages"], [])
         self.assertEqual(payload["retriever"]["engine"], "nqlite")
-        call_oio.assert_not_called()
+        call_knot.assert_not_called()
         self.assertTrue(server.closed)
 
     def test_stopword_only_query_needs_no_server_queries(self):
         server = FakeServer()
-        status, payload, call_oio = self.run_main(["what is it"], server)
+        status, payload, call_knot = self.run_main(["what is it"], server)
         self.assertEqual(status, 0)
         self.assertTrue(payload["no_evidence"])
         self.assertIsNone(payload["decision"])
-        call_oio.assert_not_called()
+        call_knot.assert_not_called()
         self.assertEqual(server.programs, [])
 
     def test_choice_needs_two_candidates(self):
         server = FakeServer(hybrid_rows=[(1, 0.02)], bm25_rows=[(1, 0.5)])
-        status, payload, call_oio = self.run_main(["how should I act?"], server)
+        status, payload, call_knot = self.run_main(["how should I act?"], server)
         self.assertEqual(status, 0)
         self.assertTrue(payload["insufficient_candidates"])
         self.assertFalse(payload["no_evidence"])
         self.assertIsNone(payload["decision"])
         self.assertEqual(len(payload["retrieved_passages"]), 1)
-        call_oio.assert_not_called()
+        call_knot.assert_not_called()
 
-    def test_choice_calls_oio_with_cited_excerpts(self):
+    def test_choice_calls_knot_with_cited_excerpts(self):
         server = FakeServer(
             hybrid_rows=[(1, 0.02), (2, 0.019)], bm25_rows=[(1, 0.5)]
         )
-        status, payload, call_oio = self.run_main(["how should I act?"], server)
+        status, payload, call_knot = self.run_main(["how should I act?"], server)
         self.assertIsNone(status)
         self.assertEqual(payload["decision"], {"ok": True})
         self.assertEqual(len(payload["retrieved_passages"]), 2)
@@ -185,17 +185,17 @@ class NqliteDemoTests(unittest.TestCase):
         self.assertTrue(
             all(item["author"] == "Test Translator" for item in payload["retrieved_passages"])
         )
-        call_oio.assert_called_once()
+        call_knot.assert_called_once()
 
     def test_score_accepts_single_candidate(self):
         server = FakeServer(hybrid_rows=[(2, 0.02)], bm25_rows=[(2, 0.5)])
-        status, payload, call_oio = self.run_main(
+        status, payload, call_knot = self.run_main(
             ["how calm is the mind?", "--mode", "score", "--top-k", "1"], server
         )
         self.assertIsNone(status)
         self.assertEqual(payload["decision"], {"ok": True})
         self.assertEqual(len(payload["retrieved_passages"]), 1)
-        call_oio.assert_called_once()
+        call_knot.assert_called_once()
 
     def test_cli_validation(self):
         server = FakeServer()

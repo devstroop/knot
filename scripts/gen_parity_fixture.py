@@ -2,7 +2,7 @@
 
 Usage:
     /path/to/laya-venv/bin/python scripts/gen_parity_fixture.py \
-        --model /path/to/checkpoint --out crates/oio/tests/fixtures/parity_english.json
+        --model /path/to/checkpoint --out crates/knot/tests/fixtures/parity_english.json
 """
 
 import argparse

@@ -1,4 +1,4 @@
-# oio Spec — Invariants
+# knot Spec — Invariants
 
 Behavior contracts that code, tests, and docs must not contradict. When one of
 these changes, update this file in the same change.
@@ -96,7 +96,7 @@ these changes, update this file in the same change.
   checkpoint (`english` / `multilingual` / `typed-decisions`); the detection
   reported on the wire is the rounded analysis (`non_latin_fraction` at 4
   decimals).
-- `OIO_DEFAULT_MODEL` overrides the fallback; explicit `model` in the request wins;
+- `KNOT_DEFAULT_MODEL` overrides the fallback; explicit `model` in the request wins;
   Jev ids (`jev-*`) mean "auto-route".
 - `typed-decisions` is never auto-selected without `auto_task_detection`.
 
@@ -125,17 +125,17 @@ these changes, update this file in the same change.
 Checkpoint directories resolve at startup, first source that yields at least
 one directory wins:
 
-1. `OIO_MODELS=name=/path[,...]` — explicit map, declaration order kept.
-2. `OIO_MODEL_DIR=/path` — shorthand for a single `english` checkpoint.
-3. Cache root: `$OIO_CACHE_DIR`, else `$XDG_CACHE_HOME/oio`, else
-   `~/.cache/oio` (ADR-002). Only directories named in `router::DEFAULT_MODELS`
+1. `KNOT_MODELS=name=/path[,...]` — explicit map, declaration order kept.
+2. `KNOT_MODEL_DIR=/path` — shorthand for a single `english` checkpoint.
+3. Cache root: `$KNOT_CACHE_DIR`, else `$XDG_CACHE_HOME/knot`, else
+   `~/.cache/knot` (ADR-002). Only directories named in `router::DEFAULT_MODELS`
    (`english`, `multilingual`) are picked up; stray subdirectories are ignored,
    and the order follows that table.
 4. Nothing resolves → startup error naming all three sources.
 
 The router's fallback model is `english`. When `english` is not among the
-resolved directories and `OIO_DEFAULT_MODEL` is unset, the fallback becomes
-the first resolved directory (source order above). `OIO_DEFAULT_MODEL`, when
+resolved directories and `KNOT_DEFAULT_MODEL` is unset, the fallback becomes
+the first resolved directory (source order above). `KNOT_DEFAULT_MODEL`, when
 set, is validated by name at startup and never second-guessed.
 
 Integrity is verify-if-present: a `SHA256SUMS` manifest beside a checkpoint
@@ -150,13 +150,13 @@ network (PRD N4).
 
 ## 10. Device (execution provider)
 
-`OIO_DEVICE=cpu|cuda`, default `cpu`. The value is the device every
+`KNOT_DEVICE=cpu|cuda`, default `cpu`. The value is the device every
 checkpoint actually loads onto — there is no auto-selection and no silent
 downgrade (PRD §4).
 
 - `cpu` — the baseline path: any build, any machine.
 - `cuda` — ort's CUDA execution provider, behind the `cuda` feature
-  (`cargo build -p oio-serve --features cuda`). The pinned ONNX Runtime
+  (`cargo build -p knot-serve --features cuda`). The pinned ONNX Runtime
   1.22 CUDA build ships CUDA 12 binaries: Turing (sm_75) or newer GPU,
   a driver compatible with the installed CUDA 12 runtime, cuDNN 9, ~2 GB
   VRAM. Requesting `cuda` on a build without the
@@ -164,12 +164,12 @@ downgrade (PRD §4).
   The feature and the provider are x86_64-Linux-only (ort ships no CUDA
   distributions elsewhere): every other target — Apple Silicon included —
   stays on `cpu`, and asking for `cuda` there is that same startup error.
-- `OIO_RUNTIME=candle` together with `OIO_DEVICE=cuda` is a startup
+- `KNOT_RUNTIME=candle` together with `KNOT_DEVICE=cuda` is a startup
   error: the CUDA path is ort's, the candle runtime is native CPU
   (ADR-001).
 - Any failure while bringing the provider up (library missing, driver too
   old, no GPU) is a load-time `Model` error: process exit at startup, 500
-  on a later reload. oio fails fast rather than computing on the CPU
+  on a later reload. knot fails fast rather than computing on the CPU
   unnoticed (PRD §4).
 - `/health` detail reports the configured device: `checkpoint_devices` is
   that value per resident name; `device` is the first resident's value,
