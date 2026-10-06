@@ -312,6 +312,46 @@ thresholds are unchanged, and these small-set numbers do not establish that
 either retriever generalizes. The interesting follow-up is a demo that keeps
 oio's abstention rule on top of nqlite recall.
 
+## nqlite-backed decision demo
+
+`scripts/gita_nqlite_demo.py` is that follow-up: the same typed-decision
+contract as `gita_decision_demo.py` (`choice`/`score`/`noul` over retrieved
+excerpts with citations, same OIO request shapes via the shared builders),
+but retrieval comes from nqlite hybrid queries instead of the hand-rolled
+indexes. Ranking uses the full query text, exactly as the spike measured;
+abstention uses a companion BM25 query over the query's content terms only
+(English stopwords stripped, unstemmed), which reproduces oio's own
+stopword-aware no-evidence semantics — measured at 0.417 dev / 0.333
+holdout abstention, identical to oio BM25's 0.417 / 0.333. A query with no
+content terms abstains without starting the server. Retrieval plumbing
+(server ownership, ingest, row parsing) is shared with the spike script.
+
+```bash
+OIO_MODEL_DIR=/path/to/laya-english cargo run -p oio-serve  # port 8000
+python3 scripts/gita_nqlite_demo.py \
+  "How should someone act without becoming attached to the result?" \
+  --gita-repo ../gita \
+  --server ../nqlite/target/debug/nql-server \
+  --mode choice --top-k 5
+```
+
+The response carries the same `decision` / `retrieved_passages` /
+`no_evidence` / `corpus` shape plus a `retriever` block (engine, hybrid mode,
+evidence rule, BM25 max score, embedding model). Unit tests use a fake server
+and never touch a real binary: `python3 -m unittest discover -s scripts -p
+'test_gita_nqlite_demo.py' -v` (10 tests: evidence rule, abstention and
+insufficient-candidate skips, payload shapes, citation mapping, CLI
+validation).
+
+Smoke observation with the existing English checkpoint (`55cf4c4...`):
+nqlite retrieved BG 3.5/3.19/3.25/3.26/18.23 for the attachment question and
+OIO chose BG 3.5 at confidence ~0.25; score mode returned 2.63 ("relevant
+support but gaps"); noul returned true at 0.749; and a Bitcoin-price query
+abstained with BM25 max score 0.0 and no OIO call. As with the BM25 demo, the
+checkpoint is not a qualified Gita reranker — confidences are low and the
+ranking comes from the retriever. The live demo path needs the FastEmbed
+environment (`scripts/requirements-gita-semantic.txt`); the unit tests do not.
+
 ## Hindi holdout
 
 The authorized clone also carries Hindi translations, so the retrieval
