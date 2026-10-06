@@ -115,8 +115,14 @@ def summarize(records):
     }
 
 
-def evaluate_model(model, items, tokenizer, batch_size, torch, progress_every=None):
-    """Run the model over encoded items and return one metric record per case."""
+def evaluate_model(model, items, tokenizer, batch_size, torch, progress_every=None,
+                   forward_fn=None):
+    """Run the model over encoded items and return one metric record per case.
+
+    ``forward_fn(ids, attention, positions, mask, qtypes, items)`` replaces the
+    model call, which is how cached-feature evaluation skips the frozen
+    encoder; it must return the same logits shape as the model.
+    """
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
     records = []
@@ -128,7 +134,10 @@ def evaluate_model(model, items, tokenizer, batch_size, torch, progress_every=No
             ids, attention, positions, mask, labels, qtypes = collate(
                 chunk, tokenizer.pad_token_id, torch
             )
-            logits, _ = model(ids, attention, positions, mask, qtypes)
+            if forward_fn is None:
+                logits, _ = model(ids, attention, positions, mask, qtypes)
+            else:
+                logits = forward_fn(ids, attention, positions, mask, qtypes, chunk)
             probabilities = torch.softmax(logits.masked_fill(~mask, -1e4), dim=-1)
             predictions = probabilities.argmax(-1).tolist()
             for row_index, item in enumerate(chunk):

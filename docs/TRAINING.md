@@ -110,9 +110,62 @@ protocols; compare against the unchanged base checkpoint; report per-primitive
 metrics and confidence calibration; and pass both ONNX and Candle parity gates
 from the same canonical weights before any deployment consideration.
 
+## Frozen-encoder feature cache
+
+Stage one freezes the encoder, so its output for a case never changes. Reusing
+it is what makes CPU training affordable: without the cache, every optimizer
+step re-runs the encoder (tens of CPU-hours per epoch); with the cache, an
+epoch only runs the two head layers.
+
+Build it once per checkpoint/data combination:
+
+```bash
+python -m training.build_feature_cache \
+  --data-dir training/out/data \
+  --model-dir /path/to/pinned/laya-checkpoint \
+  --laya-source /path/to/laya \
+  --output-dir training/out/features \
+  --split train --split validation --split calibration --split test
+```
+
+How it is guarded:
+
+- **Contents:** encoder outputs only — captured before the head's type
+  embedding — stored per case as a flat binary plus a JSON index keyed by
+  `case_id`. `--dtype float16` is the default; storage scales with
+  `cases × sequence length × hidden size` (about 0.68 MB per case at the
+  current ~330-token sequences and hidden size 1024).
+- **Provenance:** base weights SHA-256, Laya revision, and data-manifest
+  SHA-256 are recorded in the index. A cache built from different weights,
+  source revision, or prepared data is rejected as stale instead of being
+  used. Because the trainer refuses to run with any encoder parameter
+  unfrozen, the cached encoder and the live encoder are always the same
+  encoder.
+- **Verification:** after writing a split, the builder compares cached-feature
+  logits against the live forward pass on 64 cases and refuses to publish a
+  cache that predicts a different option. Trainers and evaluators re-verify on
+  every run with `--verify-cases` (default 64, `0` disables). A mismatch means
+  rebuild with `--dtype float32`; the error says so rather than continuing
+  with disagreeing paths.
+
+Use it wherever the encoder would otherwise run:
+
+```bash
+python -m training.train_frozen_head \
+  ... --feature-cache training/out/features
+
+python -m training.evaluate_checkpoint \
+  ... --feature-cache training/out/features
+```
+
+Both record the cache directory and verification summary alongside their
+metrics, so a report produced from cached features stays identifiable, and a
+missing or partial cache is an error — never a silent fallback to live
+encoder runs.
+
 ## Stage-one quality gates (predeclared)
 
-The smoke run above proves the plumbing. The first quality experiment has to
+The frozen-head smoke run proves the plumbing. The first quality experiment has to
 prove a held-out gain against the unchanged base checkpoint. These gates are
 declared before any full-corpus training run. Changing a threshold after
 seeing test numbers invalidates the experiment; thresholds change only through
