@@ -52,6 +52,18 @@ def main(argv=None):
         help="Evaluate only the first N rows; the report is marked as smoke-limited",
     )
     parser.add_argument(
+        "--feature-cache",
+        type=Path,
+        help="Directory from training.build_feature_cache; reads cached encoder features",
+    )
+    parser.add_argument(
+        "--verify-cases",
+        type=int,
+        default=None,
+        help="With --feature-cache, check cached logits against the live forward pass "
+        "(default: 64, 0 disables)",
+    )
+    parser.add_argument(
         "--progress-every",
         type=int,
         default=500,
@@ -65,6 +77,13 @@ def main(argv=None):
         parser.error("--max-cases must be positive")
     if args.progress_every < 0:
         parser.error("--progress-every must not be negative")
+    verify_cases = args.verify_cases
+    if verify_cases is None:
+        verify_cases = 64 if args.feature_cache else 0
+    if verify_cases < 0:
+        parser.error("--verify-cases must not be negative")
+    if args.verify_cases is not None and not args.feature_cache:
+        parser.error("--verify-cases requires --feature-cache")
 
     data_dir = Path(args.data_dir)
     laya_source = Path(args.laya_source).resolve()
@@ -89,6 +108,22 @@ def main(argv=None):
     import transformers
     from safetensors.torch import load_file
 
+    if args.feature_cache:
+        if __package__ in (None, ""):
+            from training.feature_cache import (
+                CacheError,
+                FeatureCache,
+                cached_forward_fn,
+                verify_cached_forward,
+            )
+        else:
+            from .feature_cache import (
+                CacheError,
+                FeatureCache,
+                cached_forward_fn,
+                verify_cached_forward,
+            )
+
     torch.set_num_threads(args.threads)
     torch, model, tokenizer, _, encode = load_model(model_dir, laya_source)
     weights_path = model_dir / "model.safetensors"
@@ -99,10 +134,55 @@ def main(argv=None):
     if not items:
         parser.error("%s split produced no encoded cases" % args.split)
 
+    forward_fn = None
+    cache_report = None
+    if args.feature_cache:
+        provenance = {
+            "base_model_sha256": sha256_file(model_dir / "model.safetensors"),
+            "laya_source_revision": laya_revision,
+            "training_data_manifest_sha256": sha256_file(data_dir / "manifest.json"),
+        }
+        cache_dir = args.feature_cache.resolve()
+        try:
+            cache = FeatureCache(
+                cache_dir / ("%s.bin" % args.split),
+                split=args.split,
+                expected_provenance=provenance,
+            )
+        except CacheError as exc:
+            parser.error(str(exc))
+        missing = cache.missing(item["case_id"] for item in items)
+        if missing:
+            cache.close()
+            parser.error(
+                "feature cache is missing %d case(s), first %r; rebuild it"
+                % (len(missing), missing[0])
+            )
+        verification = None
+        if verify_cases:
+            try:
+                verification = verify_cached_forward(
+                    model, items, cache, tokenizer, args.batch_size, torch,
+                    limit=min(verify_cases, len(items)),
+                )
+            except CacheError as exc:
+                cache.close()
+                parser.error(str(exc))
+        forward_fn = cached_forward_fn(model, cache, torch)
+        cache_report = {
+            "directory": str(cache_dir),
+            "split": args.split,
+            "cases": len(cache),
+            "verification": verification,
+        }
+
     metrics = summarize(evaluate_model(
         model, items, tokenizer, args.batch_size, torch,
         progress_every=args.progress_every or None,
+        forward_fn=forward_fn,
     ))
+    if forward_fn is not None:
+        cache.close()
     report = {
         "experiment": "stage-one-checkpoint-eval",
         "split": args.split,
@@ -122,6 +202,7 @@ def main(argv=None):
         "torch_version": torch.__version__,
         "transformers_version": transformers.__version__,
         "calibration_applied": False,
+        "feature_cache": cache_report,
         "metrics": metrics,
     }
     if args.split == "test":
@@ -137,6 +218,7 @@ def main(argv=None):
     print(json.dumps({
         "split": report["split"],
         "smoke_limited": report["smoke_limited"],
+        "feature_cache": report["feature_cache"],
         "evaluated_case_count": report["evaluated_case_count"],
         "accuracy": metrics["accuracy"],
         "by_primitive": {

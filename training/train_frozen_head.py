@@ -130,10 +130,12 @@ def load_model(model_dir, laya_source):
     return torch, model, tokenizer, cfg, encode
 
 
-def evaluate(model, items, tokenizer, batch_size, torch, progress_every=None):
+def evaluate(model, items, tokenizer, batch_size, torch, progress_every=None,
+             forward_fn=None):
     """Return aggregated held-out metrics for the encoded items."""
     return summarize(evaluate_model(
-        model, items, tokenizer, batch_size, torch, progress_every=progress_every
+        model, items, tokenizer, batch_size, torch,
+        progress_every=progress_every, forward_fn=forward_fn,
     ))
 
 
@@ -169,12 +171,31 @@ def main():
     parser.add_argument("--max-validation-per-label", type=int, default=1)
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--seed", type=int, default=20260611)
+    parser.add_argument(
+        "--feature-cache",
+        type=Path,
+        help="Directory from training.build_feature_cache; skips the frozen encoder while training",
+    )
+    parser.add_argument(
+        "--verify-cases",
+        type=int,
+        default=None,
+        help="With --feature-cache, check cached logits against the live forward pass "
+        "(default: 64, 0 disables)",
+    )
     args = parser.parse_args()
 
     if args.epochs < 1 or args.batch_size < 1 or args.max_train_per_label < 1:
         parser.error("epochs, batch-size, and max-train-per-label must be positive")
     if args.max_validation_per_label < 1 or args.threads < 1:
         parser.error("max-validation-per-label and threads must be positive")
+    verify_cases = args.verify_cases
+    if verify_cases is None:
+        verify_cases = 64 if args.feature_cache else 0
+    if verify_cases < 0:
+        parser.error("--verify-cases must not be negative")
+    if args.verify_cases is not None and not args.feature_cache:
+        parser.error("--verify-cases requires --feature-cache")
     if args.base_revision != PINNED_BASE_REVISION:
         parser.error("base-revision must match the pinned local checkpoint revision")
 
@@ -199,6 +220,26 @@ def main():
     import safetensors
     from safetensors.torch import save_file
 
+    if args.feature_cache:
+        if __package__ in (None, ""):
+            from training.feature_cache import (
+                CacheError,
+                FeatureCache,
+                cached_forward_fn,
+                forward_from_cached,
+                stack_features,
+                verify_cached_forward,
+            )
+        else:
+            from .feature_cache import (
+                CacheError,
+                FeatureCache,
+                cached_forward_fn,
+                forward_from_cached,
+                stack_features,
+                verify_cached_forward,
+            )
+
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.set_num_threads(args.threads)
@@ -211,6 +252,51 @@ def main():
     torch, model, tokenizer, _, encode = load_model(model_dir, laya_source)
     train_items = [encode(row) for row in train_rows]
     validation_items = [encode(row) for row in validation_rows]
+
+    feature_caches = {"train": None, "validation": None}
+    cache_verification = None
+    if args.feature_cache:
+        provenance = {
+            "base_model_sha256": sha256_file(model_dir / "model.safetensors"),
+            "laya_source_revision": laya_revision,
+            "training_data_manifest_sha256": sha256_file(data_dir / "manifest.json"),
+        }
+        cache_dir = args.feature_cache.resolve()
+        try:
+            train_cache = FeatureCache(
+                cache_dir / "train.bin", split="train", expected_provenance=provenance
+            )
+            validation_cache = FeatureCache(
+                cache_dir / "validation.bin",
+                split="validation",
+                expected_provenance=provenance,
+            )
+        except CacheError as exc:
+            parser.error(str(exc))
+        missing = (
+            train_cache.missing(item["case_id"] for item in train_items)
+            + validation_cache.missing(item["case_id"] for item in validation_items)
+        )
+        if missing:
+            train_cache.close()
+            validation_cache.close()
+            parser.error(
+                "feature cache is missing %d selected case(s), first %r; rebuild it"
+                % (len(missing), missing[0])
+            )
+        if verify_cases:
+            try:
+                cache_verification = verify_cached_forward(
+                    model, train_items, train_cache, tokenizer,
+                    args.batch_size, torch,
+                    limit=min(verify_cases, len(train_items)),
+                )
+            except CacheError as exc:
+                train_cache.close()
+                validation_cache.close()
+                parser.error(str(exc))
+        feature_caches = {"train": train_cache, "validation": validation_cache}
+
     trainable = [parameter for parameter in model.parameters() if parameter.requires_grad]
     trainable_count = sum(parameter.numel() for parameter in trainable)
     if not trainable or any(parameter.requires_grad for parameter in model.encoder.parameters()):
@@ -227,15 +313,30 @@ def main():
                 chunk, tokenizer.pad_token_id, torch
             )
             optimizer.zero_grad(set_to_none=True)
-            logits, _ = model(ids, attention, positions, mask, qtypes)
+            if feature_caches["train"] is not None:
+                features = stack_features(chunk, feature_caches["train"], torch)
+                logits = forward_from_cached(
+                    model, features, attention, positions, mask, qtypes, torch
+                )
+            else:
+                logits, _ = model(ids, attention, positions, mask, qtypes)
             loss = functional.cross_entropy(logits.masked_fill(~mask, -1e4), labels)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(trainable, 1.0)
             optimizer.step()
 
-    validation_metrics = evaluate(
-        model, validation_items, tokenizer, args.batch_size, torch, progress_every=1000
+    validation_forward = (
+        cached_forward_fn(model, feature_caches["validation"], torch)
+        if feature_caches["validation"] is not None
+        else None
     )
+    validation_metrics = evaluate(
+        model, validation_items, tokenizer, args.batch_size, torch,
+        progress_every=1000, forward_fn=validation_forward,
+    )
+    for cache in feature_caches.values():
+        if cache is not None:
+            cache.close()
     output_dir.mkdir(parents=True, exist_ok=True)
     weights_path = output_dir / "experimental-model.safetensors"
     save_file(
@@ -267,6 +368,14 @@ def main():
         "encoder_frozen": True,
         "trainable_parameter_count": trainable_count,
         "wall_clock_seconds": round(time.monotonic() - started, 3),
+        "feature_cache": (
+            {
+                "directory": str(args.feature_cache.resolve()),
+                "verification": cache_verification,
+            }
+            if args.feature_cache
+            else None
+        ),
         "train_case_ids": [item["case_id"] for item in train_items],
         "validation_case_ids": [item["case_id"] for item in validation_items],
         "validation_metrics_smoke_only": validation_metrics,
