@@ -45,7 +45,7 @@ def example(split, primitive, suffix):
         question,
         target,
         split,
-        "oio-authored/score-smoke",
+        "knot-authored/score-smoke",
         "authored",
         source_id,
         "Unit-test-only example.",

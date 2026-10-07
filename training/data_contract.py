@@ -16,8 +16,8 @@ SOURCES = {
         "revision": "9d081458ff52e53cf7e848f414e6e9344e4e6696",
         "license": "cc-by-4.0",
     },
-    "oio-authored/score-smoke": {
-        "revision": "oio-training-v1",
+    "knot-authored/score-smoke": {
+        "revision": "knot-training-v1",
         "license": "apache-2.0",
     },
 }
