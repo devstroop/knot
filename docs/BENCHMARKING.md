@@ -177,6 +177,52 @@ sweeps. For a target machine, pin the process to a valid CPU set with `taskset`
 and report that affinity. Use separate processes for RSS comparisons and do
 not infer a universal backend winner from one CPU/checkpoint.
 
+## Audit adapter load test (knot-nqlite)
+
+Evidence run for ADR-006's open questions **Q5** (durability tier under
+sustained load) and **Q3** (retention mechanics): how fast the audit-ledger
+writer keeps up, what happens above that rate, and what the ledger costs per
+row.
+
+**Method.** `tests/load.rs` in `crates/knot-nqlite` (ignored by default, like
+`runtime_bench`): a stub predictor returns instantly, the caller paces
+requests, and the real `AuditPredictor` writer thread does real nqlite
+writes. Three probes per run — a paced ladder (find the zero-loss envelope),
+an unpaced burst (where the *counted* incident takes over), and a
+retention phase (bytes/row + boot-time `PRUNE HISTORY` behaviour).
+Invariants asserted at every rate: `durable + counted drops == calls` and
+`durable count == accepted` — no silent loss, ever.
+
+```bash
+cargo test -p knot-nqlite --release --test load -- --ignored --nocapture
+# knobs: KNOT_LOAD_N (4000) · KNOT_LOAD_RPS (500,2000) ·
+#        KNOT_LOAD_BURST (8000) · KNOT_LOAD_CAP (1024)
+```
+
+**Measured 2026-10-07** — linux x86_64, release, rustc 1.99, 32 threads
+visible, queue capacity 1024, n = 4000/rate:
+
+| Probe | Result |
+|---|---|
+| paced 500 rps | **0 drops**, 4000/4000 durable, 8.76 s (zero-loss floor holds) |
+| paced 2000 rps | writer exceeded: 1504 *counted* drops, 2496 durable — accounting exact |
+| writer durable ceiling | **≈981 rows/s** (client peak 1572 calls/s) |
+| unpaced burst | 25 142 calls/s in, 1219 accepted (cap + drain), 6781 counted drops, durable == accepted |
+| growth | **793 B/row** (main + WAL, 2496 rows, 1.98 MB) |
+| boot `PRUNE HISTORY` | size-neutral at this scale (**+0.0%** — records stay, history→snapshot); **contract holds**: `AS OF 1` fails with `history before ts 3 was compacted (PRUNE HISTORY)` while all 2496 rows remain |
+
+**Readings (the Q5/Q3 answers).**
+
+- Evidence-grade holds **below ≈1 k rows/s**: sustained predicts at that
+  rate lose nothing. Above it the bounded queue degrades to *counted* drops —
+  never blocks the response, never silent — so capacity is the operator's
+  sizing lever (`KNOT_LOAD_CAP` ≈ sustained-rate × acceptable-loss-window).
+- The burst path answers "drop-on-full vs evidence": it is drop-on-full
+  **with an exact count**, which is the middle position ADR-006 left open.
+- Retention: rows are permanent (prune never deletes), history is bounded
+  behaviorally (old `AS OF` errors loudly) rather than by file size —
+  a max-age/max-rows policy remains an operator choice (Q3), not engine law.
+
 ## Model quality is a separate question
 
 The 12-case `eval_english.jsonl` fixture measures existing-model parity and
