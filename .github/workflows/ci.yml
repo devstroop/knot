@@ -38,6 +38,14 @@ jobs:
       - name: cargo test
         run: cargo test --workspace
 
+      # The `audit` feature (knot-nqlite wiring in knot-serve's main) is the
+      # one shape the default gates never build — ADR-006 rule 4 wants the
+      # feature-gated path linted too, or it bitrots silently. Ubuntu only:
+      # the wiring is platform-independent.
+      - name: audit feature (knot-serve + adapter)
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo clippy -p knot-serve --features audit --all-targets -- -D warnings
+
   # Full parity suites on Apple Silicon — the numeric half of the PRD N1
   # platform claim: the same checkpoint pipeline as gpu.yml (HF fetch at
   # the pinned revision + local ONNX export), cached per OS, then the
