@@ -14,7 +14,7 @@ operability, latency, strictness, and deployability.
 | Path | Contents |
 |---|---|
 | `crates/knot` | Core library: wire protocol, prompt assembly, router, ONNX/candle runtimes |
-| `crates/knot-serve` | HTTP server binary (`/v1/systemone`, `/batch`, `/health`, `/models`) + MCP stdio mode |
+| `crates/knot-serve` | HTTP server binary (`/v1/systemone`, `/v1/systemone/batch`, `/health`, `/models`) + MCP stdio mode |
 | `docs/` | PRD, plan, spec, compatibility, architecture, ADRs |
 | `scripts/` | Checkpoint fixture tooling |
 | `training/` | Optional research-only data preparation and frozen-head experiments |

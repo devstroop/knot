@@ -86,7 +86,7 @@ validate: re-run `python -m training.prepare_data` and
 
 ## 6. Deliberately unchanged
 
-- Wire protocol (`/v1/systemone`, `/batch`, `/health`, `/models`) and all
+- Wire protocol (`/v1/systemone`, `/v1/systemone/batch`, `/health`, `/models`) and all
   request/response semantics.
 - Checkpoint formats and prepared-training-data layouts.
 - Recorded evidence artifacts (`demo/results.json`) and merged ADRs keep

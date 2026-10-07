@@ -8,7 +8,7 @@ Top-level milestone plan.
 | M1 | Prompt layer | Port `build_head`/`build_sequence`/`state_room`/`window_budget`, render_options, noul labels, token cache + tokenizer lock | Unit tests byte-equal Laya's prompt token ids |
 | M2 | ONNX runtime | Load Laya ONNX exports via `ort`, marker-position logits, temperatures, confidence; `ONNXAgent` parity | ≥99% decision agreement on fixtures |
 | M3 | Router | Port `lang.py` script/stopword detection, checkpoint table, LRU, `KNOT_DEFAULT_MODEL`, `route`/`route_batch` | Router picks same checkpoint as Laya on fixture inputs |
-| M4 | Serve binary | axum: `/v1/systemone`, `/batch` ≤64, `/health`, `/models`, bearer auth, concurrency + budget caps, 413/422 semantics | Contract test suite mirrors `laya/tests/test_serve.py` shape |
+| M4 | Serve binary | axum: `/v1/systemone`, `/v1/systemone/batch` ≤64, `/health`, `/models`, bearer auth, concurrency + budget caps, 413/422 semantics | Contract test suite mirrors `laya/tests/test_serve.py` shape |
 | M5 | Long docs | Windowed `predict_long` with stride, offsets, max/most-confident window policy | Window-offset tests match Laya |
 | M6 | Calibration + shortlist | Load `rl_agent_config.json`; embedding shortlist trait | Calibration temps match Laya config |
 | M7 | MCP | stdio server with predict/route/batch tools | MCP local e2e passes |
