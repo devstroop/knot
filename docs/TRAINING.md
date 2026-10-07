@@ -18,7 +18,7 @@ All three KNOT primitives are represented, with these important distinctions:
 |---|---|---|
 | `choice` | [MASSIVE English](https://huggingface.co/datasets/AmazonScience/massive) and [BANKING77](https://huggingface.co/datasets/PolyAI/banking77) | Direct intent labels, using the datasets' official test splits |
 | `noul` | Deterministic derivation from MASSIVE domain labels | Whether an utterance belongs to its annotated domain versus a different domain. These are derived binary examples, **not** independently annotated out-of-scope examples |
-| `score` | OIO-authored synthetic smoke examples in `training/data/score_smoke.jsonl` | Exercises score serialization, tokenization, loss, and evaluation only. It is not public data or a quality benchmark |
+| `score` | knot-authored synthetic smoke examples in `training/data/score_smoke.jsonl` | Exercises score serialization, tokenization, loss, and evaluation only. It is not public data or a quality benchmark |
 
 The MASSIVE and BANKING77 dataset cards declare CC BY 4.0. Their data is
 downloaded at immutable revisions when preparing a local run; source examples
@@ -46,10 +46,12 @@ Each row contains:
   source-row identity, and derivation.
 - `language` and `tags`: slice/report metadata.
 
-Dataset IDs are frozen data-plane identifiers: the synthetic source stays
-`oio-authored/score-smoke` (revision `oio-training-v1`) even after the
-product rename, so existing prepared corpora, manifests, and feature caches
-keep validating. Do not "fix" these strings to match the product name.
+Dataset IDs are data-plane identifiers: the synthetic source is
+`knot-authored/score-smoke` (revision `knot-training-v1`). These strings were
+renamed from their original `oio-*` form when the product rename reached the
+training data (2026-10-07, see [ADR-007](ADR/007-knot-naming.md)); corpora,
+manifests, and feature caches prepared under the old IDs no longer validate
+and must be regenerated or rebuilt.
 
 The prepare step uses MASSIVE's official validation and test splits, carving
 calibration rows from its training split. BANKING77 has no official validation
@@ -207,7 +209,7 @@ A stage-one run counts as a held-out gain only if all of these hold on the
 | G1 `choice` | trained choice accuracy ≥ base choice accuracy + 0.01 absolute |
 | G2 no source regression | neither MASSIVE nor BANKING77 choice accuracy falls more than 0.005 below its base value |
 | G3 `noul` | trained noul Brier ≤ base Brier and trained noul ECE ≤ base ECE. Both may stay poor: the labels are derived, so this gate only forbids worsening |
-| G4 `score` | reported for completeness, excluded from pass/fail — the labels are OIO-authored synthetic |
+| G4 `score` | reported for completeness, excluded from pass/fail — the labels are knot-authored synthetic |
 | G5 protocol | test evaluated only after freezing; calibration fit only on `calibration`; both reports carry the split and weights hashes |
 | G6 deployment | out of scope for stage one: deployability still requires ONNX and Candle parity from the same canonical weights |
 
@@ -242,7 +244,10 @@ reminding the caller of rule 2 above.
 
 Produced from the unchanged pinned base checkpoint before any training run:
 weights `891102d372688fc2…`, data manifest `5add84afe7ff7932…`, batch 16, 16
-threads, 3,097 s wall for all 7,087 cases.
+threads, 3,097 s wall for all 7,087 cases. That manifest hash predates the
+2026-10-07 `oio-*` → `knot-*` source-ID rename: row content is otherwise
+identical, so the metrics below still describe the current corpus, but a
+freshly prepared corpus hashes differently.
 
 | Slice | Cases | Accuracy | Mean confidence | Brier | ECE |
 |---|---:|---:|---:|---:|---:|

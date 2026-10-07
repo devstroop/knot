@@ -122,7 +122,7 @@ def stratified_split(rows, labels, seed, fractions):
                 selected = group[start:start + count]
                 start += count
             outputs[name].extend(
-                (index, dict(row, _oio_row_index=index)) for index, row in selected
+                (index, dict(row, _knot_row_index=index)) for index, row in selected
             )
     for name in outputs:
         outputs[name].sort(key=lambda item: item[0])
@@ -173,7 +173,7 @@ def read_banking(path):
             text, label = row.get("text"), row.get("category")
             if not text or not label:
                 raise DataError("BANKING77 row %d is missing text or category" % (index + 1))
-            rows.append({"text": text, "label": label, "_oio_row_index": index})
+            rows.append({"text": text, "label": label, "_knot_row_index": index})
     if not rows:
         raise DataError("BANKING77 source CSV is empty")
     return rows
@@ -218,7 +218,7 @@ def massive_rows(rows, source_split, output_split, intent_names, scenario_names)
     records = []
     domain_ids = {name: index for index, name in enumerate(scenario_names)}
     for position, item in enumerate(rows):
-        index = item.get("_oio_row_index", position)
+        index = item.get("_knot_row_index", position)
         state = item["utt"].strip()
         intent = item["intent"]
         scenario = item["scenario"]
@@ -256,7 +256,7 @@ def banking_rows(rows, labels, output_split, original_split):
         index, item = value if (
             isinstance(value, tuple) and len(value) == 2 and isinstance(value[0], int)
         ) else (position, value)
-        source_id = row_identity(item, item.get("_oio_row_index", index), original_split)
+        source_id = row_identity(item, item.get("_knot_row_index", index), original_split)
         records.append(choice_row(
             item["text"].strip(), item["label"], labels,
             "banking77:%s:%s:choice" % (original_split, source_id), BANKING_ID,
@@ -393,7 +393,7 @@ def build(output_dir, cache_dir):
         "split_policy": {
             "massive": "official dev/test; stratified 10% of official train reserved for calibration",
             "banking77": "official test unchanged; stratified 10% validation and 10% calibration carved from official train",
-            "score": "OIO-authored synthetic smoke rows use their explicit fixed split assignments",
+            "score": "knot-authored synthetic smoke rows use their explicit fixed split assignments",
             "exact_text_overlap": "keep the highest-priority split in test, validation, calibration, train order; never remove official test rows",
         },
         "exact_text_overlap_excluded_rows": exact_text_exclusions,

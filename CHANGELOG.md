@@ -35,6 +35,15 @@ migration guide).
   and [docs/ADR/007-knot-naming.md](docs/ADR/007-knot-naming.md).
 - Repository moved `devstroop/oio` → `devstroop/knot` (redirect preserved);
   `oio` stays as the parent initiative name.
+- Training data-plane identifiers renamed off `oio` (the ADR-007 freeze of
+  these strings is revoked): the synthetic score source is now
+  `knot-authored/score-smoke` (revision `knot-training-v1`), internal row
+  keys are `_knot_row_index`, and the prepared-data manifest note reads
+  "knot-authored". Corpora and feature caches issued under the old IDs no
+  longer validate — re-run `python -m training.prepare_data` +
+  `python -m training.validate_data`, then rebuild the feature cache.
+  Recorded evidence (`demo/results.json`) keeps its original names as
+  history.
 
 Behavior, wire protocol (`/v1/systemone`), checkpoint formats, and eval
 semantics are unchanged — parity fixtures pass byte-identical across the

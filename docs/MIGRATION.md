@@ -68,13 +68,26 @@ The training-data download default moved likewise to
   follow the repo; bare `knot` is taken on crates.io by an unrelated project,
   so publishing that name is out of scope — see ADR-007).
 
-## 5. Deliberately unchanged
+## 5. Training data-plane identifiers (renamed)
+
+The synthetic score source was initially frozen under its original name,
+then renamed off `oio` as well (2026-10-07):
+
+| Before | After |
+|---|---|
+| dataset `oio-authored/score-smoke` | `knot-authored/score-smoke` |
+| revision `oio-training-v1` | `knot-training-v1` |
+| internal `_oio_row_index` keys | `_knot_row_index` |
+
+Prepared corpora and feature caches issued under the old IDs no longer
+validate: re-run `python -m training.prepare_data` and
+`python -m training.validate_data`, then rebuild the feature cache with
+`python -m training.build_feature_cache`.
+
+## 6. Deliberately unchanged
 
 - Wire protocol (`/v1/systemone`, `/batch`, `/health`, `/models`) and all
   request/response semantics.
 - Checkpoint formats and prepared-training-data layouts.
-- Training dataset IDs (`oio-authored/score-smoke`, revision
-  `oio-training-v1`): frozen data-plane identifiers — do not "fix" them (see
-  `docs/TRAINING.md`).
 - Recorded evidence artifacts (`demo/results.json`) and merged ADRs keep
   original names as history.

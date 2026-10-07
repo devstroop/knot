@@ -1,7 +1,9 @@
 """Generate crates/knot/src/lang_data.rs from laya/laya/lang.py data tables."""
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "/home/devstroop/oio-workspace/laya")
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO_ROOT.parent / "laya"))
 from laya import lang
 
 def rust_str_set(name, items, per_line=8):
@@ -37,6 +39,6 @@ for name, rs in ranges:
     parts.append(f'    ("{name}", &[{", ".join(f"({lo:#x}, {hi:#x})" for lo, hi in rs)}]),')
 parts.append("];")
 
-with open("/home/devstroop/oio-workspace/knot/crates/knot/src/lang_data.rs", "w") as f:
+with open(_REPO_ROOT / "crates/knot/src/lang_data.rs", "w") as f:
     f.write("\n\n".join(parts) + "\n")
 print("wrote lang_data.rs")

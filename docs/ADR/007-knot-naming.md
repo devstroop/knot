@@ -31,11 +31,15 @@ the decision is the plain name `knot`, qualified as "OIO Knot" in prose).
   so `cargo publish` of a `knot` library is blocked. Local builds, path/git
   dependencies, and CI are unaffected, and nothing here publishes today.
   Revisit only if publishing matters.
-- Data-plane identifiers are frozen: the training dataset stays
-  `oio-authored/score-smoke` (revision `oio-training-v1`), internal
-  `_oio_row_index` keys stay, and recorded evidence artifacts
-  (`demo/results.json`) keep their original names. Renaming them would
-  invalidate prepared corpora, manifests, and feature caches for cosmetics.
+- Data-plane identifiers were frozen here at rename time, to avoid
+  invalidating prepared corpora, manifests, and feature caches for
+  cosmetics. **Revoked 2026-10-07** (maintainer direction: no `oio` in live
+  identifiers): the training dataset is now `knot-authored/score-smoke`
+  (revision `knot-training-v1`) and internal `_knot_row_index` keys replace
+  `_oio_row_index`; corpora and caches issued under the old IDs are
+  regenerated or rebuilt as described in MIGRATION.md. Still frozen as
+  recorded history: evidence artifacts (`demo/results.json`) keep their
+  original names.
 - Historical ADRs (001–006) keep their original names as written; history is
   not rewritten.
 
