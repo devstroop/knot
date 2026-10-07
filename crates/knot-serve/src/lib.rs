@@ -13,9 +13,12 @@ use axum::{Json, Router};
 pub mod mcp;
 pub mod model;
 
-use knot::engine::Engine;
 use knot::error::Error;
-use knot::protocol::{SystemOneRequest, SystemOneResponse};
+use knot::protocol::SystemOneRequest;
+
+// The inference contract lives in core (ADR-006 rule 6); re-exported here
+// so `knot_serve::Predictor` keeps working for servers, tests, and stubs.
+pub use knot::Predictor;
 
 pub const MAX_QUESTIONS: usize = 64;
 pub const MAX_STATE_CHARS: usize = 50_000;
@@ -34,91 +37,6 @@ const REFUSALS: [&str; 5] = [
     "hooks_raise",
     "hooks_timeout",
 ];
-
-/// Everything the server needs from the inference side; `Engine` implements it
-/// and tests inject a stub.
-pub trait Predictor: Send + Sync {
-    fn predict(&self, req: &SystemOneRequest) -> knot::Result<SystemOneResponse>;
-    fn predict_batch(
-        &self,
-        states: &[serde_json::Value],
-        template: SystemOneRequest,
-        opts: knot::engine::BatchOpts,
-    ) -> knot::Result<Vec<SystemOneResponse>>;
-    fn loaded(&self) -> Vec<&'static str>;
-    /// Device resident checkpoints compute on (SPEC §10) — the `device` /
-    /// `checkpoint_devices` entries of `/health`. Defaults to `cpu`, the
-    /// only device a stub can have.
-    fn device(&self) -> &'static str {
-        "cpu"
-    }
-    /// Artifact commit a resident checkpoint was loaded from — the
-    /// `revisions` entry of `/health`. `None` (the default, what stubs
-    /// report) means "unknown / local path", Laya's value for one.
-    fn revision(&self, _name: &str) -> Option<String> {
-        None
-    }
-    fn route(
-        &self,
-        state: &serde_json::Value,
-        questions: Option<&std::collections::HashMap<String, serde_json::Value>>,
-        model: Option<&str>,
-        task: Option<&str>,
-        lang: Option<&str>,
-        lang_guess: Option<&str>,
-    ) -> knot::Result<serde_json::Value>;
-}
-
-impl Predictor for Engine {
-    fn predict(&self, req: &SystemOneRequest) -> knot::Result<SystemOneResponse> {
-        Engine::predict(self, req)
-    }
-
-    fn predict_batch(
-        &self,
-        states: &[serde_json::Value],
-        template: SystemOneRequest,
-        opts: knot::engine::BatchOpts,
-    ) -> knot::Result<Vec<SystemOneResponse>> {
-        Engine::predict_batch(self, states, template, opts)
-    }
-
-    fn loaded(&self) -> Vec<&'static str> {
-        self.resident()
-    }
-
-    fn device(&self) -> &'static str {
-        Engine::device(self).as_str()
-    }
-
-    fn revision(&self, name: &str) -> Option<String> {
-        Engine::revision(self, name)
-    }
-
-    fn route(
-        &self,
-        state: &serde_json::Value,
-        questions: Option<&std::collections::HashMap<String, serde_json::Value>>,
-        model: Option<&str>,
-        task: Option<&str>,
-        lang: Option<&str>,
-        lang_guess: Option<&str>,
-    ) -> knot::Result<serde_json::Value> {
-        let d = self
-            .router
-            .lock()
-            .unwrap()
-            .route(state, questions, model, task, lang, lang_guess)?;
-        // Lay a's `RouteDecision` dict, in its key order, nulls included.
-        Ok(serde_json::json!({
-            "model": d.model,
-            "repo": d.repo,
-            "reason": d.reason,
-            "detection": serde_json::to_value(&d.detection).unwrap_or(serde_json::Value::Null),
-            "workflow": d.workflow,
-        }))
-    }
-}
 
 #[derive(Clone)]
 pub struct ServeConfig {

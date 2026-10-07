@@ -7,6 +7,16 @@ migration guide).
 
 ## [Unreleased]
 
+### Added
+
+- `Predictor` moved to core as **`knot::Predictor`** (ADR-006 rule 6): the
+  inference-side contract now lives beside `SystemOneRequest`/`Engine`, so a
+  future nqlite adapter crate can depend on `knot` without pulling
+  `knot-serve` — which would otherwise form a package cycle through the
+  single binary (ADR-004). `knot_serve::Predictor` keeps working via a
+  re-export; no behavior change, parity fixtures untouched. Gated with the
+  engine (`onnx`/`candle`), so a no-runtime build stays clean.
+
 ### Changed (breaking)
 
 - Renamed the decision engine `oio` → **knot**: crates `oio`/`oio-serve` are

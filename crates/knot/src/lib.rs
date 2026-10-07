@@ -15,9 +15,13 @@ pub mod runtime;
 pub mod candle_runtime;
 #[cfg(any(feature = "onnx", feature = "candle"))]
 pub mod engine;
+#[cfg(any(feature = "onnx", feature = "candle"))]
+pub mod predictor;
 #[cfg(feature = "tokenizer")]
 pub mod prompt;
 #[cfg(feature = "tokenizer")]
 pub mod shortlist;
 
 pub use error::{Error, Result};
+#[cfg(any(feature = "onnx", feature = "candle"))]
+pub use predictor::Predictor;
