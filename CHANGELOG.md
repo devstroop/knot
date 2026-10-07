@@ -16,6 +16,15 @@ migration guide).
   single binary (ADR-004). `knot_serve::Predictor` keeps working via a
   re-export; no behavior change, parity fixtures untouched. Gated with the
   engine (`onnx`/`candle`), so a no-runtime build stays clean.
+- **`knot-nqlite` adapter crate** (ADR-006 seam B): an opt-in `Predictor`
+  decorator that appends one nqlite transaction per decision *after* the
+  response — `state -[:decided]-> decision -[:used_checkpoint]-> checkpoint`
+  plus a hash-only decision row (length-limited excerpt; full state is never
+  stored). Off by default: enable per deployment with the `audit` feature of
+  `knot-serve` + `KNOT_AUDIT_DB=<store-file>` (capacity/excerpt via
+  `KNOT_AUDIT_CAPACITY` / `KNOT_AUDIT_EXCERPT`). Bounded queue with counted
+  overflow (never blocks the hot path, never silent), dedicated writer
+  thread owning the single store handle, `PRUNE HISTORY` on boot.
 
 ### Changed (breaking)
 
