@@ -5,7 +5,7 @@
 A self-hosted, open alternative to
 TypeSafe's hosted Jev API, compatible with Laya's `/v1/systemone` wire protocol.
 
-Non-autoregressive "System 1" decisions over typed questions (`choice` / `score` / `noul`)
+Non-autoregressive "System One" decisions over typed questions (`choice` / `score` / `noul`)
 in one forward pass. knot targets
 operability, latency, strictness, and deployability.
 
