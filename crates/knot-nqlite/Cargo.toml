@@ -1,0 +1,17 @@
+[package]
+name = "knot-nqlite"
+description = "Optional nqlite persistence adapters for knot (ADR-006): decision audit ledger"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Predictor lives behind the engine gate (onnx|candle) — enable it here.
+knot = { workspace = true, features = ["onnx"] }
+nql = { git = "https://github.com/devstroop/nqlite" }
+nqlite = { git = "https://github.com/devstroop/nqlite" }
+anyhow.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tracing.workspace = true

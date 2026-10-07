@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/knot", "crates/knot-serve"]
+members = ["crates/knot", "crates/knot-serve", "crates/knot-nqlite"]
 
 [workspace.package]
 version = "0.1.0"

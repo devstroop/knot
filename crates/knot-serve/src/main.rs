@@ -96,6 +96,15 @@ async fn main() -> Result<()> {
         max_token_budget: env_usize("KNOT_MAX_TOKEN_BUDGET", 8192),
     };
 
+    #[cfg(feature = "audit")]
+    let engine: Arc<dyn knot_serve::Predictor> = match knot_nqlite::AuditConfig::from_env() {
+        Some(cfg) => {
+            tracing::info!(path = %cfg.path.display(), "audit ledger enabled (nqlite)");
+            Arc::new(knot_nqlite::AuditPredictor::new(engine, cfg)?)
+        }
+        None => Arc::new(engine),
+    };
+    #[cfg(not(feature = "audit"))]
     let engine: Arc<dyn knot_serve::Predictor> = Arc::new(engine);
     if mcp_mode {
         tracing::info!("knot-mcp stdio server");
