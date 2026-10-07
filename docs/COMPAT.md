@@ -66,6 +66,10 @@ compact. Scalar reprs follow Python: `True`/`False`, `1.0`, `1e-05`.
 
 ## Deliberate differences from Jev
 
+The Jev column is confirmed against `docs.typesafe.ai` (API reference,
+`/confidence`, `/models`; fetched 2026-10-07) where the docs publish a value;
+evidence links in `RESEARCH-COMPARE.md`.
+
 | Area | Jev | Laya | knot |
 |---|---|---|---|
 | Options per question | cap 255 | shared `head_max_len` budget (192/256), trim, then 422; HTTP guard ≤100 (413) | same as Laya |
@@ -75,6 +79,11 @@ compact. Scalar reprs follow Python: `True`/`False`, `1.0`, `1e-05`.
 | `usage.truncated` in long-doc scan | — | summed window cuts (a count; test `> 0`) | `bool`, OR over windows (single-shot Laya also sends a bool) |
 | Choice criteria as a list of labels | — | accepted; normalizes to `{str(label): None}` | same; `choice` and `probabilities` keys use Python `str()`, so a non-string label echoes as its text (`"True"`, `"7"`) rather than the typed JSON value |
 | Privacy/infra | hosted API | self-hosted, Apache 2.0 | self-hosted, Apache 2.0 |
+| Missing required field | `422` naming the field (published error model; no 400 anywhere) | `400` (`'state' is required`, `docs/http-api.md`) | same as Laya |
+| Rate / overload signalling | `429` rate limit (honours `retry-after`), `529` overloaded | `503` + `Retry-After: 1` (`server busy, try again later`) | same as Laya |
+| Request budgets | 64k tokens state + all questions; 32k state + longest question; no documented question-count cap (218-question fan-outs are documented) | guards: 64 questions, 50 000 state chars, 64 batch states, 2 MiB body (→ 413) | same as Laya |
+| Model listing route | `GET /v1/models` → `{models: [{name, description, release_date}]}` | no route | `GET /models` → `{models: [name]}` — knot extension (HTTP surface below), path *and* shape differ from Jev |
+| Strict Jev response shape | the only shape | `LAYA_JEV_STRICT=1` projects onto it (`serve.py:163`, `a880352`, 2026-10-02): no root `routing`, no per-answer `action`/`answer_confidence`, no noul `confidence`, usage reduced to `input_tokens`+`output_tokens` | not carried — knot always serves the full Laya shape (a `KNOT_JEV_STRICT`-style knob is the open question if a Jev-validating client ever appears) |
 
 ## Recorded Jev responses
 
@@ -129,7 +138,10 @@ quality/latency numbers: `docs/RESEARCH-COMPARE.md`.
 - `GET /models` is **knot's extension** — laya-serve has no such route
   (`docs/http-api.md` lists only `/health`, `/v1/systemone`,
   `/v1/systemone/batch`). Clients written against Jev/Laya never call it;
-  it exists for local introspection.
+  it exists for local introspection. Jev itself does serve a models route —
+  `GET /v1/models` returning `{models: [{name, description, release_date}]}`
+  (docs.typesafe.ai, fetched 2026-10-07) — so the route's *idea* is Jev's,
+  but knot's path and shape are its own.
 
 ## Porting checklist for an existing client
 
