@@ -155,10 +155,17 @@ fn responses_pass_through_and_ledger_persists_after_flush() {
             "full state must not be stored: {e}"
         );
     }
+    // Row ORDER is hash-dependent (ids salt with time+pid → stable per store,
+    // not across runs/platforms) — assert on the set, not the position.
     assert!(
-        excerpts[0].contains("the quar"),
-        "excerpt keeps the leading chars: {}",
-        excerpts[0]
+        excerpts
+            .iter()
+            .any(|e| e.starts_with("{\"doc\":") && e.contains("the quar")),
+        "predict-row excerpt keeps the leading chars: {excerpts:?}"
+    );
+    assert!(
+        excerpts.iter().any(|e| e.starts_with("{\"batch\":")),
+        "batch row carries its combined state excerpt: {excerpts:?}"
     );
 
     std::fs::remove_dir_all(&dir).ok();
