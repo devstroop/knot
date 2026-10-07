@@ -14,7 +14,7 @@ knot is a Rust implementation of the same decision-engine inference path, expose
 
 - `knot` library crate — prompt assembly, checkpoint router, ONNX inference, confidence,
   calibration, long-document windowing.
-- `knot` binary — Jev/Laya-compatible HTTP server (`POST /v1/systemone`, `/batch`,
+- `knot` binary — Jev/Laya-compatible HTTP server (`POST /v1/systemone`, `POST /v1/systemone/batch`,
   `/health`, `/models`) with auth, budgets, and concurrency controls.
 
 ## 3. Goals
@@ -71,7 +71,7 @@ replay), per the gap ranking at the end of `RESEARCH-COMPARE.md`.
 | F6 | Router: script/stopword detection, checkpoint pick, `KNOT_DEFAULT_MODEL` override, LRU `max_loaded=2` |
 | F7 | `predict_long`-style windowing with stride overlap + offset reporting |
 | F8 | `predict_batch` grouping by checkpoint + question schema |
-| F9 | HTTP: `/v1/systemone`, `/batch` (≤64 states), `/health`, `/models`; bearer auth; 413 option guard (≤100 choices); 422 validation |
+| F9 | HTTP: `/v1/systemone`, `/v1/systemone/batch` (≤64 states), `/health`, `/models`; bearer auth; 413 option guard (≤100 choices); 422 validation |
 | F10 | Long-context checkpoints: `max_len=8192` opt-in |
 | F11 | Shortlist hook: embedding-based pre-filter before typed head |
 | F12 | MCP stdio server exposing predict/route/batch tools (v2 of serve crate) |
