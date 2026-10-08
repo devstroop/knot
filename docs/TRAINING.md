@@ -315,6 +315,99 @@ The full JSON reports live in ignored `training/out/test-base.json` and
 `training/out/test-trained-epoch2.json`. Do not edit these numbers by hand;
 do not re-run test evaluation to shop for better thresholds.
 
+## Stage-one deployment (G6) — plan
+
+*(Written 2026-10-08, after the frozen test verdict above. Goal: serve the
+epoch-2 trained weights as a canonical checkpoint with the base
+checkpoint's guarantees — determinism (SPEC §8), dual-runtime parity, and
+evidence bound to a revision.)*
+
+**0. Artifact reality check (done).** `training/out/` is gitignored: the
+recorded run's artifacts — `experimental-model-epoch2.safetensors`
+(sha256 `67b21817…`), `test-base.json`, `test-trained-epoch2.json`,
+`baseline-validation.json` — are **not on this machine**. What survives:
+the prepared splits + feature caches (provenance manifest `1f69a82e…`,
+weights `891102d3…`, laya `4aa6761`), the frozen recipe, and the recorded
+numbers in this document. The run must therefore be reproduced first.
+
+**1. Recover the run (recipe frozen — no new choices).**
+Rerun `python -m training.train_frozen_head` with the recorded recipe
+(2 epochs, lr 1e-4, seed 20260611, full 38,988-row corpus, frozen
+ModernBERT encoder) on the surviving caches; ~2 × 10+ CPU-hours.
+Then the **weights-identity fork — decide BEFORE touching test**:
+
+- rerun sha256 **equals** `67b21817…` → artifacts recovered; the recorded
+  test numbers attach to these exact weights; zero protocol questions →
+  continue at step 2;
+- sha differs (cross-host torch non-determinism) → maintainer decision,
+  recorded as an explicit revision before any evaluation:
+  (i) one fresh `test` evaluation of the rerun weights (the "exactly
+  twice" rule already spent its two on artifacts that no longer exist —
+  a revision must say so *before* results are seen), or
+  (ii) deploy on validation evidence only (epoch-2 val 0.7206 vs base
+  0.5764) and mark the test-split gains as attached to the lost artifact.
+  Recommendation: (i), gated on the revision landing first.
+
+**2. Materialize the checkpoint (ADR-005 layout).**
+Copy the pinned base dir; replace `model.safetensors` with the epoch-2
+weights (the trainer saves a full `state_dict`, `strict=True` load —
+encoder/tokenizer/config untouched); write the manifest (base hub rev
+`55cf4c4e…`, base weights `891102d3…`, trained `67b21817…` or the rerun's
+hash, data manifest `1f69a82e…`, recipe + seed, laya `4aa6761`) plus the
+40-hex `.cache/huggingface/download/*.metadata` first line so health
+`revisions` binds every evidence row to this checkpoint (keep the base dir
+as `english-base` for reproductions). **Deployment shape: directory swap
+of `english`** — router names are a fixed enum (`english`/`multilingual`/
+`typed-decisions`), so a new name would need router changes; the swap
+keeps routing, `KNOT_DEFAULT_MODEL`, and the #37 fallback semantics
+untouched.
+
+**3. Torch↔ONNX (G6, ONNX half).**
+Export with the pinned laya toolchain (laya `4aa6761` + torch-cpu venv —
+the parity-macos recipe: `scripts/export_onnx.py` over the materialized
+dir → `laya.onnx` + `.data`). Two gates:
+- **per-row parity**: regenerate the torch reference for the frozen
+  `parity_english` collated inputs *under the trained weights*, then run
+  knot's `onnx_parity` assertion (|ORT − torch| < 5e-3, masked ≤ −1e3
+  skipped) — same contract, new reference;
+- **metric reproduction**: `evaluate_checkpoint` against the **exported**
+  dir on `validation` reproduces the recorded epoch-2 numbers (choice
+  0.7206, noul Brier/ECE) within float noise. Validation only — `test`
+  stays spent.
+
+**4. Candle parity (G6, Candle half).**
+`KNOT_RUNTIME=candle` + `KNOT_MODEL_DIR=<trained-dir>` through knot's
+candle tier (candle reads the same `model.safetensors` — literally "the
+same canonical weights") with the same tolerance. Both runtimes green =
+G6 discharged.
+
+**5. Golden replay for the new revision (ADR-005).**
+Record a replay set bound to the trained checkpoint's revision (the
+existing `golden_*`/`engine_*` fixtures are **base-bound** — they encode
+Laya parity and will fail against trained weights by design; they keep
+gating the base dir in CI. The trained dir gets its own recorded responses
+so SPEC §8 determinism has something to replay).
+
+**6. Rollout + evidence.**
+Swap the dir → restart `:8123`/`:8124` + the VS Code MCP server → assert
+health/`revisions` shows the new revision → knot's own suite run against
+the trained dir (transport/limits/MCP + the new replay set; base fixtures
+run against the base dir as CI does) → record CHANGELOG + this section's
+verdict table. The jev-free differential harness stays informational
+(divergence from hosted jev is *expected* once answers change).
+
+**Deferred (declared, not dropped):** calibration refit on the
+`calibration` split — a separate change (it moves confidences, so it needs
+its own validation + abstention-impact note); dual-runtime export parity
+for `multilingual`/`typed-decisions` (only `english` exists today).
+
+**Decisions (2026-10-08, taken before step 1 ran):** weights-identity fork =
+**option (i)** — if the rerun is not bit-identical to `67b21817…`, an explicit
+protocol revision (one fresh `test` evaluation of the rerun weights) lands
+*before* any evaluation, numbers unseen; deployment shape = **directory swap
+of `english`**, base preserved as `english-base`. Step 1 (the frozen-recipe
+rerun) starts on these terms.
+
 ## Future stages
 
 1. **Data and smoke pipeline:** licensed adapters, provenance/split validation,
