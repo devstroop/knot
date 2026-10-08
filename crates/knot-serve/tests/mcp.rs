@@ -95,6 +95,42 @@ fn predictor() -> Arc<dyn Predictor> {
     Arc::new(Stub)
 }
 
+/// Strict MCP clients (VS Code) reject `type: array` inputSchema properties
+/// without `items` — the tool then fails validation with "tool parameters
+/// array type must have items". Every array property in every tool must
+/// declare one (`{}` = any knot state value).
+#[test]
+fn every_array_property_declares_items() {
+    let p = predictor();
+    let list = handle_message(
+        &p,
+        &json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}),
+    )
+    .unwrap();
+    let mut checked = 0;
+    for tool in list["result"]["tools"].as_array().unwrap() {
+        let props = &tool["inputSchema"]["properties"];
+        if props.is_null() {
+            continue;
+        }
+        for (key, schema) in props.as_object().unwrap() {
+            if schema["type"] == "array" {
+                assert!(
+                    schema.get("items").is_some(),
+                    "{}.{} declares type array without items",
+                    tool["name"],
+                    key
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(
+        checked >= 1,
+        "expected at least one array property to guard"
+    );
+}
+
 #[test]
 fn initialize_and_tools_list() {
     let p = predictor();
