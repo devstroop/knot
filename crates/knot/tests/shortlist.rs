@@ -78,6 +78,7 @@ fn canned(_res: SystemOneRequest) -> SystemOneResponse {
             reason: "stub".into(),
             detection: None,
             workflow: None,
+            fallback: None,
         },
         shortlist: None,
     }

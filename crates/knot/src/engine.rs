@@ -341,6 +341,42 @@ impl Engine {
         Ok(arc)
     }
 
+    /// The checkpoint an unconfigured route falls back to (#37): the router
+    /// default (`KNOT_DEFAULT_MODEL` / english) when it has a source dir,
+    /// otherwise the first configured source. `None` when nothing is loaded.
+    fn fallback_source(&self) -> Option<&'static str> {
+        let default = self.router.lock().unwrap().default;
+        if self.sources.iter().any(|(n, _)| *n == default) {
+            return Some(default);
+        }
+        self.sources.first().map(|(n, _)| *n)
+    }
+
+    /// Match the route against this deployment's configured sources (#37).
+    /// An unconfigured checkpoint serves from a configured one with the
+    /// substitution recorded on the decision (`routing.fallback`) — never
+    /// silently; with no configured checkpoint the request fails loudly
+    /// (`Error::CheckpointUnavailable`, which serve maps to 503).
+    pub(crate) fn resolve_decision(
+        &self,
+        decision: &mut crate::router::RouteDecision,
+    ) -> Result<()> {
+        if self.sources.iter().any(|(n, _)| *n == decision.model) {
+            return Ok(());
+        }
+        let served = self
+            .fallback_source()
+            .ok_or_else(|| Error::CheckpointUnavailable(decision.model.to_string()))?;
+        tracing::warn!(
+            requested = decision.model,
+            served,
+            "routed checkpoint has no source directory; serving from fallback \
+             (set KNOT_MODEL_DIR to configure it, KNOT_DEFAULT_MODEL to steer it)"
+        );
+        decision.with_fallback(served);
+        Ok(())
+    }
+
     /// Parse and route one request into a collatable item.
     fn prepare(&self, req: SystemOneRequest) -> Result<Item> {
         let mut questions: IndexMap<String, InternalQuestion> = IndexMap::new();
@@ -375,12 +411,13 @@ impl Engine {
 
     /// Predict one state over a question set — the Laya `predict` shape.
     pub fn predict(&self, req: &SystemOneRequest) -> Result<SystemOneResponse> {
-        let item = self.prepare(req.clone())?;
+        let mut item = self.prepare(req.clone())?;
         if item.questions.is_empty() {
             // Laya short-circuits empty questions without tokenizing or running
             // a forward pass: empty answers, the two zero counters, no more.
             return Ok(Self::empty_response(&item));
         }
+        self.resolve_decision(&mut item.decision)?;
         let ckpt = self.checkpoint(item.decision.model)?;
         let mut out = self.run_group(&ckpt, &[&item], BatchOpts::default())?;
         Ok(out.pop().expect("one response per item"))
@@ -712,10 +749,13 @@ impl Engine {
         }
         let mut by_model: BTreeMap<&'static str, Vec<usize>> = BTreeMap::new();
         let mut out: Vec<Option<SystemOneResponse>> = states.iter().map(|_| None).collect();
-        for (i, item) in items.iter().enumerate() {
+        for (i, item) in items.iter_mut().enumerate() {
             if item.questions.is_empty() {
                 out[i] = Some(Self::empty_response(item));
             } else {
+                // Issue #37: resolve unconfigured routes before grouping so the
+                // group key is the checkpoint that will actually run.
+                self.resolve_decision(&mut item.decision)?;
                 by_model.entry(item.decision.model).or_default().push(i);
             }
         }
@@ -758,7 +798,7 @@ impl Engine {
             .iter()
             .map(|(k, v)| (k.clone(), serde_json::to_value(v).unwrap()))
             .collect();
-        let decision = self.router.lock().unwrap().route(
+        let mut decision = self.router.lock().unwrap().route(
             &req.state,
             Some(&raw_questions),
             req.model.as_deref().filter(|m| !m.starts_with("jev")),
@@ -766,6 +806,7 @@ impl Engine {
             req.lang.as_deref(),
             req.lang_guess.as_deref(),
         )?;
+        self.resolve_decision(&mut decision)?;
         let ckpt = self.checkpoint(decision.model)?;
 
         let max_len = req.max_len.unwrap_or(ckpt.max_len);

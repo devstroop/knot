@@ -77,6 +77,7 @@ impl Predictor for Stub {
                 reason: "stub".into(),
                 detection: None,
                 workflow: None,
+                fallback: None,
             },
             shortlist: None,
         })
@@ -598,4 +599,28 @@ async fn batch_controls_validate_like_laya() {
     )
     .await;
     assert_eq!(st, 200);
+}
+
+/// Issue #37, fail-loud half: a routed checkpoint this deployment does not
+/// configure, with no fallback source at all, is a configuration problem —
+/// 503 with the real reason, not the generic 500. Engine + serve together,
+/// no model files needed (empty sources).
+#[tokio::test]
+async fn unconfigured_checkpoint_without_fallback_is_503() {
+    let engine = knot::engine::Engine::load(knot::router::Router::new(), &[]).unwrap();
+    let (st, body, _) = call(
+        build_app(Arc::new(engine), ServeConfig::default()),
+        "POST",
+        "/v1/systemone",
+        json!({"state": "hello", "questions": simple_q()}),
+    )
+    .await;
+    assert_eq!(st, 503, "{body}");
+    assert!(
+        body["detail"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("not configured"),
+        "{body}"
+    );
 }

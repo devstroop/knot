@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 use crate::lang::Analysis;
-use crate::router::RouteDecision;
+use crate::router::{RouteDecision, RouteFallback};
 
 /// Answer payload `model` value: the name Laya reports on every result.
 pub const AGENT_MODEL: &str = "laya-rl-agent";
@@ -186,6 +186,8 @@ impl Answer {
 
 /// Laya's `RouteDecision` dict, serialized with all five keys in its order;
 /// `detection`/`workflow` are `null` when absent rather than omitted.
+/// `fallback` is knot's own #37 extension — omitted entirely when the routed
+/// checkpoint was configured, so configured responses stay byte-stable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Routing {
     pub model: String,
@@ -195,6 +197,8 @@ pub struct Routing {
     pub detection: Option<Analysis>,
     #[serde(default)]
     pub workflow: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback: Option<RouteFallback>,
 }
 
 impl From<&RouteDecision> for Routing {
@@ -205,6 +209,7 @@ impl From<&RouteDecision> for Routing {
             reason: d.reason.clone(),
             detection: d.detection.clone(),
             workflow: d.workflow.map(str::to_string),
+            fallback: d.fallback.clone(),
         }
     }
 }

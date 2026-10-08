@@ -314,6 +314,13 @@ pub fn handle_message(
 ) -> Option<serde_json::Value> {
     let method = msg.get("method").and_then(|v| v.as_str());
     let id = msg.get("id").cloned();
+    // JSON-RPC 2.0 §4.1: a notification (message without `id`) never gets a
+    // response — including unknown methods such as
+    // `notifications/roots/list_changed`. Answering with `id: null` makes
+    // strict MCP clients log protocol errors.
+    if id.is_none() && method.is_some() {
+        return None;
+    }
     match method {
         Some("initialize") => Some(json_rpc(
             id,
