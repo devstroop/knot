@@ -1,0 +1,121 @@
+{
+ "health": {
+  "status": 200,
+  "body": "{\"status\":\"ok\",\"loaded\":[\"english\"],\"revisions\":{\"english\":\"55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851\"},\"device\":\"cpu\",\"device_is_preference\":false,\"checkpoint_devices\":{\"english\":\"cpu\"},\"cpu_fallbacks\":{\"english\":{\"count\":0,\"last_reason\":null}}}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "245"
+  }
+ },
+ "models": {
+  "status": 200,
+  "body": "{\"models\":[\"english\"]}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "22"
+  }
+ },
+ "post_on_health": {
+  "status": 405,
+  "body": "",
+  "headers": {
+   "allow": "GET,HEAD",
+   "content-length": "0"
+  }
+ },
+ "get_on_systemone": {
+  "status": 405,
+  "body": "",
+  "headers": {
+   "allow": "POST",
+   "content-length": "0"
+  }
+ },
+ "unknown_path": {
+  "status": 404,
+  "body": "",
+  "headers": {
+   "content-length": "0"
+  }
+ },
+ "empty_body": {
+  "status": 400,
+  "body": "{\"detail\":\"request body must be valid JSON\"}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "44"
+  }
+ },
+ "bad_json": {
+  "status": 400,
+  "body": "{\"detail\":\"request body must be valid JSON\"}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "44"
+  }
+ },
+ "missing_state": {
+  "status": 400,
+  "body": "{\"detail\":\"'state' is required\"}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "32"
+  }
+ },
+ "missing_questions": {
+  "status": 400,
+  "body": "{\"detail\":\"request body must be an object with a 'questions' field\"}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "68"
+  }
+ },
+ "bad_type_field": {
+  "status": 400,
+  "body": "{\"detail\":\"'questions' must match the request schema\"}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "54"
+  }
+ },
+ "wrong_content_type": {
+  "status": 200,
+  "body": "{\"model\":\"laya-rl-agent\",\"answers\":{},\"usage\":{\"input_tokens\":0,\"output_tokens\":0},\"routing\":{\"model\":\"english\",\"repo\":\"convaiinnovations/laya\",\"reason\":\"Latin script, language not identified and no non-English letters; using default (english)\",\"detection\":{\"script\":\"latin\",\"script_profile\":{\"latin\":1.0},\"language\":null,\"is_english\":true,\"language_undecided\":true,\"diacritic_rate\":0.0,\"non_latin_fraction\":0.0,\"mixed_segment\":null},\"workflow\":null}}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "451"
+  }
+ },
+ "no_content_type": {
+  "status": 200,
+  "body": "{\"model\":\"laya-rl-agent\",\"answers\":{},\"usage\":{\"input_tokens\":0,\"output_tokens\":0},\"routing\":{\"model\":\"english\",\"repo\":\"convaiinnovations/laya\",\"reason\":\"Latin script, language not identified and no non-English letters; using default (english)\",\"detection\":{\"script\":\"latin\",\"script_profile\":{\"latin\":1.0},\"language\":null,\"is_english\":true,\"language_undecided\":true,\"diacritic_rate\":0.0,\"non_latin_fraction\":0.0,\"mixed_segment\":null},\"workflow\":null}}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "451"
+  }
+ },
+ "state_null": {
+  "status": 400,
+  "body": "{\"detail\":\"'state' is required\"}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "32"
+  }
+ },
+ "batch_missing_body": {
+  "status": 400,
+  "body": "{\"detail\":\"request body must be an object with 'states' and 'questions' fields\"}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "80"
+  }
+ },
+ "minimal_ok": {
+  "status": 200,
+  "body": "{\"model\":\"laya-rl-agent\",\"answers\":{\"q\":{\"type\":\"noul\",\"noul\":0.1932000070810318,\"confidence\":0.8068000078201294,\"answer_confidence\":0.8068000078201294,\"action\":{\"act_probability\":1.0}}},\"usage\":{\"input_tokens\":29,\"output_tokens\":0,\"state_tokens\":1,\"state_tokens_dropped\":0,\"truncated\":false,\"truncated_questions\":[]},\"routing\":{\"model\":\"english\",\"repo\":\"convaiinnovations/laya\",\"reason\":\"Latin script, language not identified and no non-English letters; using default (english)\",\"detection\":{\"script\":\"latin\",\"script_profile\":{\"latin\":1.0},\"language\":null,\"is_english\":true,\"language_undecided\":true,\"diacritic_rate\":0.0,\"non_latin_fraction\":0.0,\"mixed_segment\":null},\"workflow\":null}}",
+  "headers": {
+   "content-type": "application/json",
+   "content-length": "686"
+  }
+ }
+}

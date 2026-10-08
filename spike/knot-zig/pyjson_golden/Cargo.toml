@@ -1,0 +1,10 @@
+[package]
+name = "pyjson_golden"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Path dep on knot itself: the golden must be knot's OWN pyjson::dumps, not a
+# reimplementation. default features = [] keeps onnx/tokenizers out (fast).
+knot = { path = "/root/ai-workspace/knot/crates/knot" }
+serde_json = { version = "1", features = ["preserve_order"] }

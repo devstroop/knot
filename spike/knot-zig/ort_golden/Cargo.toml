@@ -1,0 +1,9 @@
+[package]
+name = "ort_golden"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Exactly knot's pin + features, so the same static ORT 1.22.0 (ED1716 cache
+# dir) links and the same session defaults apply.
+ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "download-binaries"] }

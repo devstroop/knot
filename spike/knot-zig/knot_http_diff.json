@@ -1,0 +1,122 @@
+[
+ {
+  "case": "health",
+  "verdict": "MATCH",
+  "knot": 200,
+  "skel": 200,
+  "knot_body": "{\"status\":\"ok\",\"loaded\":[\"english\"],\"revisions\":{\"english\":\"55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851\"},\"device\":\"cpu\",\"device_is_preference\":false,\"checkpoint_devices\":{\"english\":\"cpu\"},\"cpu_fallbacks\":{\"english\":{\"count\":0,\"last_reason\":null}}}",
+  "skel_body": "{\"status\":\"ok\",\"loaded\":[\"english\"],\"revisions\":{\"english\":\"55cf4c4ebb4ebe31b2550e8bdf3bd21b99753851\"},\"device\":\"cpu\",\"device_is_preference\":false,\"checkpoint_devices\":{\"english\":\"cpu\"},\"cpu_fallbacks\":{\"english\":{\"count\":0,\"last_reason\":null}}}"
+ },
+ {
+  "case": "models",
+  "verdict": "MATCH",
+  "knot": 200,
+  "skel": 200,
+  "knot_body": "{\"models\":[\"english\"]}",
+  "skel_body": "{\"models\":[\"english\"]}"
+ },
+ {
+  "case": "post_on_health",
+  "verdict": "MATCH",
+  "knot": 405,
+  "skel": 405,
+  "knot_body": "",
+  "skel_body": ""
+ },
+ {
+  "case": "get_on_systemone",
+  "verdict": "MATCH",
+  "knot": 405,
+  "skel": 405,
+  "knot_body": "",
+  "skel_body": ""
+ },
+ {
+  "case": "unknown_path",
+  "verdict": "MATCH",
+  "knot": 404,
+  "skel": 404,
+  "knot_body": "",
+  "skel_body": ""
+ },
+ {
+  "case": "empty_body",
+  "verdict": "MATCH",
+  "knot": 400,
+  "skel": 400,
+  "knot_body": "{\"detail\":\"request body must be valid JSON\"}",
+  "skel_body": "{\"detail\":\"request body must be valid JSON\"}"
+ },
+ {
+  "case": "bad_json",
+  "verdict": "MATCH",
+  "knot": 400,
+  "skel": 400,
+  "knot_body": "{\"detail\":\"request body must be valid JSON\"}",
+  "skel_body": "{\"detail\":\"request body must be valid JSON\"}"
+ },
+ {
+  "case": "missing_state",
+  "verdict": "MATCH",
+  "knot": 400,
+  "skel": 400,
+  "knot_body": "{\"detail\":\"'state' is required\"}",
+  "skel_body": "{\"detail\":\"'state' is required\"}"
+ },
+ {
+  "case": "missing_questions",
+  "verdict": "MATCH",
+  "knot": 400,
+  "skel": 400,
+  "knot_body": "{\"detail\":\"request body must be an object with a 'questions' field\"}",
+  "skel_body": "{\"detail\":\"request body must be an object with a 'questions' field\"}"
+ },
+ {
+  "case": "bad_type_field",
+  "verdict": "MATCH",
+  "knot": 400,
+  "skel": 400,
+  "knot_body": "{\"detail\":\"'questions' must match the request schema\"}",
+  "skel_body": "{\"detail\":\"'questions' must match the request schema\"}"
+ },
+ {
+  "case": "wrong_content_type",
+  "verdict": "MATCH",
+  "knot": 200,
+  "skel": 200,
+  "knot_body": "{\"model\":\"laya-rl-agent\",\"answers\":{},\"usage\":{\"input_tokens\":0,\"output_tokens\":0},\"routing\":{\"model\":\"english\",\"repo\":\"convaiinnovations/laya\",\"reason\":\"Latin script, language not identified and no non-English letters; using default (english)\",\"detection\":{\"script\":\"latin\",\"script_profile\":{\"latin\":1.0},\"language\":null,\"is_english\":true,\"language_undecided\":true,\"diacritic_rate\":0.0,\"non_latin_fraction\":0.0,\"mixed_segment\":null},\"workflow\":null}}",
+  "skel_body": "{\"model\":\"laya-rl-agent\",\"answers\":{},\"usage\":{\"input_tokens\":0,\"output_tokens\":0},\"routing\":{\"model\":\"english\",\"repo\":\"convaiinnovations/laya\",\"reason\":\"Latin script, language not identified and no non-English letters; using default (english)\",\"detection\":{\"script\":\"latin\",\"script_profile\":{\"latin\":1.0},\"language\":null,\"is_english\":true,\"language_undecided\":true,\"diacritic_rate\":0.0,\"non_latin_fraction\":0.0,\"mixed_segment\":null},\"workflow\":null}}"
+ },
+ {
+  "case": "no_content_type",
+  "verdict": "MATCH",
+  "knot": 200,
+  "skel": 200,
+  "knot_body": "{\"model\":\"laya-rl-agent\",\"answers\":{},\"usage\":{\"input_tokens\":0,\"output_tokens\":0},\"routing\":{\"model\":\"english\",\"repo\":\"convaiinnovations/laya\",\"reason\":\"Latin script, language not identified and no non-English letters; using default (english)\",\"detection\":{\"script\":\"latin\",\"script_profile\":{\"latin\":1.0},\"language\":null,\"is_english\":true,\"language_undecided\":true,\"diacritic_rate\":0.0,\"non_latin_fraction\":0.0,\"mixed_segment\":null},\"workflow\":null}}",
+  "skel_body": "{\"model\":\"laya-rl-agent\",\"answers\":{},\"usage\":{\"input_tokens\":0,\"output_tokens\":0},\"routing\":{\"model\":\"english\",\"repo\":\"convaiinnovations/laya\",\"reason\":\"Latin script, language not identified and no non-English letters; using default (english)\",\"detection\":{\"script\":\"latin\",\"script_profile\":{\"latin\":1.0},\"language\":null,\"is_english\":true,\"language_undecided\":true,\"diacritic_rate\":0.0,\"non_latin_fraction\":0.0,\"mixed_segment\":null},\"workflow\":null}}"
+ },
+ {
+  "case": "state_null",
+  "verdict": "MATCH",
+  "knot": 400,
+  "skel": 400,
+  "knot_body": "{\"detail\":\"'state' is required\"}",
+  "skel_body": "{\"detail\":\"'state' is required\"}"
+ },
+ {
+  "case": "batch_missing_body",
+  "verdict": "MATCH",
+  "knot": 400,
+  "skel": 400,
+  "knot_body": "{\"detail\":\"request body must be an object with 'states' and 'questions' fields\"}",
+  "skel_body": "{\"detail\":\"request body must be an object with 'states' and 'questions' fields\"}"
+ },
+ {
+  "case": "minimal_ok",
+  "verdict": "MATCH",
+  "knot": 200,
+  "skel": 200,
+  "knot_body": "{\"model\":\"laya-rl-agent\",\"answers\":{\"q\":{\"type\":\"noul\",\"noul\":0.1932000070810318,\"confidence\":0.8068000078201294,\"answer_confidence\":0.8068000078201294,\"action\":{\"act_probability\":1.0}}},\"usage\":{\"input_tokens\":29,\"output_tokens\":0,\"state_tokens\":1,\"state_tokens_dropped\":0,\"truncated\":false,\"truncated_questions\":[]},\"routing\":{\"model\":\"english\",\"repo\":\"convaiinnovations/laya\",\"reason\":\"Latin script, language not identified and no non-English letters; using default (english)\",\"detection\":{\"script\":\"latin\",\"script_profile\":{\"latin\":1.0},\"language\":null,\"is_english\":true,\"language_undecided\":true,\"diacritic_rate\":0.0,\"non_latin_fraction\":0.0,\"mixed_segment\":null},\"workflow\":null}}",
+  "skel_body": "{\"model\":\"laya-rl-agent\",\"answers\":{\"q\":{\"type\":\"noul\",\"noul\":0.1932000070810318,\"confidence\":0.8068000078201294,\"answer_confidence\":0.8068000078201294,\"action\":{\"act_probability\":1.0}}},\"usage\":{\"input_tokens\":29,\"output_tokens\":0,\"state_tokens\":1,\"state_tokens_dropped\":0,\"truncated\":false,\"truncated_questions\":[]},\"routing\":{\"model\":\"english\",\"repo\":\"convaiinnovations/laya\",\"reason\":\"Latin script, language not identified and no non-English letters; using default (english)\",\"detection\":{\"script\":\"latin\",\"script_profile\":{\"latin\":1.0},\"language\":null,\"is_english\":true,\"language_undecided\":true,\"diacritic_rate\":0.0,\"non_latin_fraction\":0.0,\"mixed_segment\":null},\"workflow\":null}}"
+ }
+]
