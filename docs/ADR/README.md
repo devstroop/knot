@@ -13,3 +13,4 @@ supersede it with a new one (`Supersedes: 00x`).
 | [006](006-optional-nqlite-adapters.md) | optional persistence adapters (nqlite) outside the inference path | proposed |
 | [007](007-knot-naming.md) | knot naming: OIO parent, knot engine (supersedes 002 naming) | accepted |
 | [008](008-knot-zig-canary-phase2.md) | knot-in-zig canary — phase-2 gate (session wiring + parity + bench) | proposed |
+| [009](009-knot-zig-canary-verdict.md) | knot-in-zig canary verdict — record green gates, keep Rust canonical, charter phase-3 entry | proposed |
