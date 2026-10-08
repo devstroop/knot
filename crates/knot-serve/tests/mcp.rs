@@ -50,6 +50,7 @@ impl Predictor for Stub {
                 reason: "stub".into(),
                 detection: None,
                 workflow: None,
+                fallback: None,
             },
             shortlist: None,
         })
@@ -225,7 +226,7 @@ async fn stdio_e2e_over_duplex() {
     let mut client_tx = client_tx;
     client_tx
         .write_all(
-            b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"knot_status\",\"arguments\":{}}}\n",
+            b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\"}\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n{\"jsonrpc\":\"2.0\",\"method\":\"notifications/roots/list_changed\"}\n{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"knot_status\",\"arguments\":{}}}\n",
         )
         .await
         .unwrap();
@@ -237,6 +238,10 @@ async fn stdio_e2e_over_duplex() {
     let mut saw_status = false;
     while let Some(line) = lines.next_line().await.unwrap() {
         let v: Value = serde_json::from_str(&line).unwrap();
+        assert!(
+            !v["id"].is_null(),
+            "never answer a notification with id: null — got {line}"
+        );
         if v["id"] == 3 {
             let text = v["result"]["content"][0]["text"].as_str().unwrap();
             let payload: Value = serde_json::from_str(text).unwrap();
@@ -245,7 +250,7 @@ async fn stdio_e2e_over_duplex() {
         }
         count += 1;
     }
-    assert_eq!(count, 3, "notification must not get a response");
+    assert_eq!(count, 3, "notifications (known or unknown) get no response");
     assert!(saw_status);
     server.await.unwrap().unwrap();
 }

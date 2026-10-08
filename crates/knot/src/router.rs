@@ -131,6 +131,15 @@ pub fn repo_str(key: &str) -> String {
         .unwrap_or_else(|| BUNDLE_REPO.to_string())
 }
 
+/// Issue #37: the routed checkpoint has no source directory in this
+/// deployment and a configured one served instead — kept on the decision so
+/// every surface (`routing.fallback`, MCP `knot_route`) reports it.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RouteFallback {
+    pub requested: String,
+    pub served: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct RouteDecision {
     pub model: &'static str,
@@ -139,9 +148,26 @@ pub struct RouteDecision {
     pub reason: String,
     pub detection: Option<Analysis>,
     pub workflow: Option<&'static str>,
+    /// Set only when #37's fallback fired; omitted from the wire otherwise.
+    pub fallback: Option<RouteFallback>,
 }
 
 impl RouteDecision {
+    /// Issue #37: repoint the decision at the checkpoint that will actually
+    /// run and record the substitution (`fallback` + a reason suffix).
+    pub fn with_fallback(&mut self, served: &'static str) {
+        self.fallback = Some(RouteFallback {
+            requested: self.model.to_string(),
+            served: served.to_string(),
+        });
+        self.reason = format!(
+            "{} — checkpoint {:?} is not configured here; served from {served:?} instead",
+            self.reason, self.model
+        );
+        self.model = served;
+        self.repo = repo_str(served);
+    }
+
     fn new(
         model: &'static str,
         reason: String,
@@ -154,6 +180,7 @@ impl RouteDecision {
             reason,
             detection,
             workflow,
+            fallback: None,
         }
     }
 }

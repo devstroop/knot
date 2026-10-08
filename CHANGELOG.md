@@ -49,6 +49,26 @@ Behavior, wire protocol (`/v1/systemone`), checkpoint formats, and eval
 semantics are unchanged — parity fixtures pass byte-identical across the
 rename.
 
+### Fixed
+
+- **Routing to an unconfigured checkpoint no longer 500s** (#37): on a
+  single-checkpoint deploy, a non-Latin/mixed-language state routed to
+  `multilingual` and failed with the generic 500 `inference failed` —
+  which broke MCP tool calls (VS Code chat turns) and HTTP requests
+  alike. The request now serves from a configured checkpoint (router
+  default / first loaded) with the substitution recorded in
+  `routing.fallback: {requested, served}` and a warn log — Laya's
+  "ignore unavailable", made auditable instead of silent. When the
+  deployment configured no checkpoint at all, the request fails loud as
+  `CheckpointUnavailable` → **503** with the real reason and a
+  `KNOT_MODEL_DIR`/`KNOT_DEFAULT_MODEL` hint. Configured routes and
+  parity fixtures stay byte-identical (`fallback` is omitted when
+  absent).
+- **MCP stdio no longer answers notifications**: unknown notifications
+  (e.g. `notifications/roots/list_changed`) were replied to with an
+  `id: null` error response — JSON-RPC 2.0 forbids answering a
+  notification, and strict clients logged protocol errors for it.
+
 ## 0.1.0 — history
 
 Earlier work is recorded in git history and the [decision

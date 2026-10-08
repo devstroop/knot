@@ -12,6 +12,14 @@ pub enum Error {
     #[error("model error: {0}")]
     Model(String),
 
+    /// Issue #37: the routed checkpoint has no source directory and this
+    /// deployment configured no checkpoint to fall back to. Serve maps it
+    /// to 503 — a configuration problem, not an engine bug.
+    #[error(
+        "checkpoint {0:?} is not configured; this deployment has no fallback checkpoint (set KNOT_MODEL_DIR or KNOT_DEFAULT_MODEL)"
+    )]
+    CheckpointUnavailable(String),
+
     #[error(transparent)]
     Io(#[from] std::io::Error),
 

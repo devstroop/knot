@@ -292,6 +292,12 @@ fn batch_opts(body: &serde_json::Value) -> std::result::Result<knot::engine::Bat
 }
 
 fn map_error(e: Error) -> Response {
+    if let Error::CheckpointUnavailable(_) = &e {
+        // Issue #37: routed to a checkpoint this deployment does not
+        // configure, with no fallback source — 503 says so plainly instead
+        // of the generic 500.
+        return json_error(StatusCode::SERVICE_UNAVAILABLE, e.to_string());
+    }
     match e {
         Error::InvalidRequest(msg) => json_error(StatusCode::UNPROCESSABLE_ENTITY, msg),
         Error::PayloadTooLarge(msg) => json_error(StatusCode::PAYLOAD_TOO_LARGE, msg),

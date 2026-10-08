@@ -404,3 +404,124 @@ fn assert_same_answers(
         }
     }
 }
+
+/// Issue #37: a non-Latin state routes to `multilingual`, which this
+/// deployment does not configure — the request serves from `english` with
+/// the substitution recorded in `routing.fallback` (never a silent 500).
+#[test]
+fn unconfigured_route_falls_back_with_flag() {
+    let Ok(dir) = std::env::var("KNOT_MODEL_DIR") else {
+        eprintln!("skip: KNOT_MODEL_DIR not set");
+        return;
+    };
+    let dir = std::path::PathBuf::from(dir);
+    if !dir.join("laya.onnx").exists() {
+        eprintln!("skip: laya.onnx missing");
+        return;
+    }
+    let engine = Engine::load(Router::new(), &[("english", &dir)]).unwrap();
+    let req: SystemOneRequest = serde_json::from_value(serde_json::json!({
+        "state": "مرحبا بالعالم",
+        "questions": {"q": {"type": "noul", "instructions": "Is this greeted?"}},
+    }))
+    .unwrap();
+
+    let res = engine.predict(&req).unwrap();
+    let fb = res.routing.fallback.as_ref().expect("fallback recorded");
+    assert_eq!(fb.requested, "multilingual");
+    assert_eq!(fb.served, "english");
+    assert_eq!(res.routing.model, "english");
+    assert!(
+        res.routing.reason.contains("not configured"),
+        "{}",
+        res.routing.reason
+    );
+    // The configured case stays flag-free (byte-stable wire).
+    let plain: SystemOneRequest = serde_json::from_value(serde_json::json!({
+        "state": "hello",
+        "questions": {"q": {"type": "noul", "instructions": "Is this greeted?"}},
+    }))
+    .unwrap();
+    let res = engine.predict(&plain).unwrap();
+    assert!(res.routing.fallback.is_none());
+
+    // MCP `knot_route` reports the same substitution.
+    let v = knot::Predictor::route(
+        &engine,
+        &serde_json::json!("مرحبا بالعالم"),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    assert_eq!(v["model"], "english");
+    assert_eq!(v["fallback"]["served"], "english");
+    assert_eq!(v["fallback"]["requested"], "multilingual");
+}
+
+/// With no configured checkpoint at all there is nothing to fall back to:
+/// `CheckpointUnavailable`, which serve maps to a plain 503 (#37's
+/// fail-loud half). Needs no model files.
+#[test]
+fn no_configured_checkpoint_fails_loud() {
+    let engine = Engine::load(Router::new(), &[]).unwrap();
+    let req: SystemOneRequest = serde_json::from_value(serde_json::json!({
+        "state": "hello",
+        "questions": {"q": {"type": "noul", "instructions": "mentioned?"}},
+    }))
+    .unwrap();
+    let err = engine.predict(&req).unwrap_err();
+    assert!(
+        matches!(err, knot::Error::CheckpointUnavailable(_)),
+        "expected CheckpointUnavailable, got {err:?}"
+    );
+}
+
+/// Issue #37 in batch form: resolution runs BEFORE grouping, so an
+/// unconfigured route and a configured one collapse onto the checkpoint
+/// that will actually run — one group serves both, each response keeps
+/// its own flag. A regression to resolve-after-grouping (or no resolve)
+/// fails here with `checkpoint "multilingual" has no source directory`.
+#[test]
+fn batch_resolves_fallback_before_grouping() {
+    let Ok(dir) = std::env::var("KNOT_MODEL_DIR") else {
+        eprintln!("skip: KNOT_MODEL_DIR not set");
+        return;
+    };
+    let dir = std::path::PathBuf::from(dir);
+    if !dir.join("laya.onnx").exists() {
+        eprintln!("skip: laya.onnx missing");
+        return;
+    }
+    let engine = Engine::load(Router::new(), &[("english", &dir)]).unwrap();
+    let states = vec![
+        serde_json::json!("مرحبا بالعالم"), // routes to multilingual → fallback
+        serde_json::json!("hello there"),   // routes to english as-is
+    ];
+    let template: SystemOneRequest = serde_json::from_value(serde_json::json!({
+        "state": "template placeholder",
+        "questions": {"q": {"type": "noul", "instructions": "mentioned?"}},
+    }))
+    .unwrap();
+
+    let results = engine
+        .predict_batch(&states, template, knot::engine::BatchOpts::default())
+        .unwrap();
+    assert_eq!(results.len(), 2);
+
+    // Unconfigured route: served by english, substitution flagged.
+    assert_eq!(results[0].routing.model, "english");
+    let fb = results[0]
+        .routing
+        .fallback
+        .as_ref()
+        .expect("fallback recorded");
+    assert_eq!(fb.requested, "multilingual");
+    assert_eq!(fb.served, "english");
+
+    // Configured route: no flag (wire stays byte-stable).
+    assert_eq!(results[1].routing.model, "english");
+    assert!(results[1].routing.fallback.is_none());
+}

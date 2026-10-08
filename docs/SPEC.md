@@ -11,12 +11,17 @@ these changes, update this file in the same change.
   `model` is the agent id `laya-rl-agent`; the routed checkpoint is
   `routing.model`/`routing.repo`.
 - `routing` is always present: `{model, repo, reason, detection, workflow}`
-  with `detection`/`workflow` nullable.
+  with `detection`/`workflow` nullable. When the routed checkpoint is not
+  configured on this deployment, a configured one serves instead and
+  `routing` gains `fallback: {requested, served}` (omitted otherwise) with
+  `routing.model` naming the checkpoint that actually ran (#37).
 - `usage.output_tokens` is always `0` (non-autoregressive; no decoded
   tokens); a single-shot predict also always carries `state_tokens`,
   `state_tokens_dropped`, `truncated`, `truncated_questions`. Empty
   `questions` short-circuits before any tokenization/forward pass with
-  empty `answers` and the two-key usage `{input_tokens: 0, output_tokens: 0}`.
+  empty `answers` and the two-key usage `{input_tokens: 0, output_tokens: 0}`;
+  `routing` reports the raw route decision there — no `fallback`, because
+  no checkpoint was resolved or run.
 - Typed answers: `choice: {choice, confidence, answer_confidence}`,
   `score: {score, confidence, answer_confidence}`,
   `noul: {noul, confidence, answer_confidence}`.
@@ -107,7 +112,9 @@ these changes, update this file in the same change.
   configured; `/health` liveness always open (detail payload requires the
   bearer, see §1).
 - Library errors map: `InvalidRequest` → 422, `PayloadTooLarge` → 413,
-  `Model` → 500.
+  `CheckpointUnavailable` → 503 (routed checkpoint not configured and no
+  fallback source — set `KNOT_MODEL_DIR` / `KNOT_DEFAULT_MODEL`), `Model`
+  → 500.
 
 ## 7. Long documents
 

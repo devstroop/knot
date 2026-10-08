@@ -77,18 +77,24 @@ impl Predictor for Engine {
         lang: Option<&str>,
         lang_guess: Option<&str>,
     ) -> Result<serde_json::Value> {
-        let d = self
+        let mut d = self
             .router
             .lock()
             .unwrap()
             .route(state, questions, model, task, lang, lang_guess)?;
-        // Lay a's `RouteDecision` dict, in its key order, nulls included.
-        Ok(serde_json::json!({
+        self.resolve_decision(&mut d)?;
+        // Lay a's `RouteDecision` dict, in its key order, nulls included;
+        // `fallback` (knot's #37 extension) appears only on a substitution.
+        let mut out = serde_json::json!({
             "model": d.model,
             "repo": d.repo,
             "reason": d.reason,
             "detection": serde_json::to_value(&d.detection).unwrap_or(serde_json::Value::Null),
             "workflow": d.workflow,
-        }))
+        });
+        if let Some(fb) = &d.fallback {
+            out["fallback"] = serde_json::to_value(fb).unwrap_or(serde_json::Value::Null);
+        }
+        Ok(out)
     }
 }
