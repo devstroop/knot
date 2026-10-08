@@ -65,7 +65,10 @@ fn tools() -> Vec<(&'static str, &'static str, serde_json::Value)> {
             serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "states": { "type": "array" },
+                    // `items` required: strict MCP clients (VS Code) reject
+                    // `type: array` without it — "tool parameters array type
+                    // must have items". `{}` = any knot state value.
+                    "states": { "type": "array", "items": {} },
                     "questions": { "type": "object" },
                     "model": { "type": "string" },
                     "max_len": { "type": "integer" },
