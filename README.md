@@ -3,7 +3,7 @@
 [![CI](https://github.com/devstroop/knot/actions/workflows/ci.yml/badge.svg)](https://github.com/devstroop/knot/actions/workflows/ci.yml)
 
 A self-hosted, open alternative to
-TypeSafe's hosted Jev API, compatible with Laya's `/v1/systemone` wire protocol.
+TypeSafe's hosted Jev API, compatible `/v1/systemone` protocol.
 
 Non-autoregressive "System One" decisions over typed questions (`choice` / `score` / `noul`)
 in one forward pass. knot targets
